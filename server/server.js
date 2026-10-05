@@ -1,4 +1,6 @@
 import express from 'express'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import homeRouter from './routes/home.js'
 import aboutRouter from './routes/about.js'
 import researchRouter from './routes/research.js'
@@ -8,6 +10,8 @@ import experienceRouter from './routes/experience.js'
 import internationalRouter from './routes/international.js'
 import labRouter from './routes/lab.js'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 3000
 
@@ -29,6 +33,13 @@ app.use('/api/projects', projectsRouter)
 app.use('/api/experience', experienceRouter)
 app.use('/api/international', internationalRouter)
 app.use('/api/lab', labRouter)
+
+// Serve the built Vue frontend
+app.use(express.static(path.join(__dirname, '../dist')))
+
+app.get('/{*splat}', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'))
+})
 
 // Start server
 app.listen(PORT, () => {
