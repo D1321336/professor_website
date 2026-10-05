@@ -6,9 +6,29 @@ db.serialize(() => {
     CREATE TABLE navigation_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
-      path TEXT NOT NULL,
+      path TEXT NOT NULL UNIQUE,
       sort_order INTEGER DEFAULT 0,
       is_visible INTEGER DEFAULT 1
+    )
+  `)
+
+  db.run(`
+    CREATE TABLE site_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `)
+
+  db.run(`
+    CREATE TABLE content_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      section TEXT NOT NULL,
+      key TEXT NOT NULL,
+      title TEXT NOT NULL,
+      short_title TEXT,
+      label TEXT,
+      sort_order INTEGER DEFAULT 0,
+      UNIQUE(section, key)
     )
   `)
 

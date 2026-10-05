@@ -2,6 +2,8 @@ import db from './db.js'
 
 const tables = [
   'navigation_items',
+  'site_settings',
+  'content_groups',
   'profile',
   'positions',
   'research_areas',

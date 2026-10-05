@@ -37,6 +37,21 @@ router.get('/', (req, res) => {
     ORDER BY sort_order ASC
   `
 
+  const navigationSql = `
+    SELECT id, name, path, sort_order
+    FROM navigation_items
+    WHERE is_visible = 1
+    ORDER BY sort_order ASC
+  `
+
+  const settingsSql = `SELECT key, value FROM site_settings`
+
+  const groupsSql = `
+    SELECT id, section, key, title, short_title, label, sort_order
+    FROM content_groups
+    ORDER BY section ASC, sort_order ASC
+  `
+
   db.get(profileSql, [], (profileErr, profile) => {
     if (profileErr) {
       console.error('Error getting profile:', profileErr.message)
@@ -65,10 +80,25 @@ router.get('/', (req, res) => {
           })
         }
 
-        res.json({
-          profile,
-          positions,
-          research_areas: researchAreas,
+        db.all(navigationSql, [], (navigationErr, navigationItems) => {
+          if (navigationErr) return res.status(500).json({ error: 'Failed to get navigation' })
+
+          db.all(settingsSql, [], (settingsErr, settingRows) => {
+            if (settingsErr) return res.status(500).json({ error: 'Failed to get site settings' })
+
+            db.all(groupsSql, [], (groupsErr, contentGroups) => {
+              if (groupsErr) return res.status(500).json({ error: 'Failed to get content groups' })
+
+              res.json({
+                profile,
+                positions,
+                research_areas: researchAreas,
+                navigation_items: navigationItems,
+                settings: Object.fromEntries(settingRows.map((row) => [row.key, row.value])),
+                content_groups: contentGroups,
+              })
+            })
+          })
         })
       })
     })

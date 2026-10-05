@@ -2,7 +2,14 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 type Item = Record<string, string | number | null>
-type HomeData = { profile?: Item; positions?: Item[]; research_areas?: Item[] }
+type HomeData = {
+  profile?: Item
+  positions?: Item[]
+  research_areas?: Item[]
+  navigation_items?: Item[]
+  settings?: Record<string, string>
+  content_groups?: Item[]
+}
 type AboutData = { profile?: Item; research_interests?: Item[] }
 type ResearchData = { research?: Item[]; research_summaries?: Item[] }
 type PublicationsData = { journal_papers?: Item[]; conference_papers?: Item[]; other_publications?: Item[]; patents?: Item[] }
@@ -40,7 +47,7 @@ const detailType = ref<'research' | 'project'>('research')
 const selectedDetail = ref<Item>({})
 const activeExperienceGroup = ref('professional_service')
 const activeInternationalGroup = ref('visit_exchange')
-const activeLabGroup = ref<'topics' | 'members' | 'activities'>('topics')
+const activeLabGroup = ref('topics')
 const displayedBio = ref('')
 const projectMarquee = ref<HTMLElement | null>(null)
 const projectDragging = ref(false)
@@ -53,40 +60,40 @@ let publicationTimer: ReturnType<typeof window.setInterval> | null = null
 const publicationStepTimers: ReturnType<typeof window.setTimeout>[] = []
 let scrollTicking = false
 
-const navItems = ['Home', 'Research', 'Publications', 'Projects', 'Experience', 'International', 'Lab', 'Contact']
-const experienceGroups = [
-  { key: 'professional_service', title: '專業服務', number: '01' },
-  { key: 'teaching', title: '教學與人才培育', number: '02' },
-  { key: 'training', title: '專業訓練', number: '03' },
-]
-const internationalGroups = [
-  { key: 'visit_exchange', title: '國際訪問與技術交流', shortTitle: '訪問交流', number: '01' },
-  { key: 'approved_cooperation', title: '已核定國際合作', shortTitle: '核定合作', number: '02' },
-  { key: 'developing_cooperation', title: '洽談或發展中的合作', shortTitle: '發展合作', number: '03' },
-]
-const labGroups = [
-  { key: 'topics' as const, title: '主要研究主題', shortTitle: '研究主題', label: 'RESEARCH TOPICS', number: '01' },
-  { key: 'members' as const, title: '實驗室成員', shortTitle: '實驗室成員', label: 'LAB MEMBERS', number: '02' },
-  { key: 'activities' as const, title: '實驗室活動', shortTitle: '實驗室活動', label: 'FIELD & LAB LOG', number: '03' },
-]
 const profile = computed(() => home.value.profile ?? {})
 const positions = computed(() => home.value.positions ?? [])
 const researchAreas = computed(() => home.value.research_areas ?? [])
+const settings = computed(() => home.value.settings ?? {})
+const navItems = computed(() => (home.value.navigation_items ?? []).map((item) => String(item.name)))
+const groupsFor = (section: string) => computed(() => (home.value.content_groups ?? [])
+  .filter((item) => item.section === section)
+  .map((item, index) => ({
+    key: String(item.key),
+    title: String(item.title),
+    shortTitle: String(item.short_title || item.title),
+    label: String(item.label || ''),
+    number: String(index + 1).padStart(2, '0'),
+  })))
+const experienceGroups = groupsFor('experience')
+const internationalGroups = groupsFor('international')
+const labGroups = groupsFor('lab')
+const publicationGroupLabels = groupsFor('publications')
 const aboutProfile = computed(() => about.value.profile ?? {})
 const researchInterests = computed(() => about.value.research_interests ?? [])
 const aboutParagraphs = computed(() => {
   const text = String(aboutProfile.value.full_bio || '').trim()
   return text ? text.split(/\r?\n/).filter(Boolean) : []
 })
-const fallbackBio = '黃振家博士現任逢甲大學水利工程與資源保育學系副教授，研究聚焦水庫與河川泥砂運移、水庫防淤排砂、水工模型試驗、數值模擬及現地監測，並結合人工智慧、影像分析與數位孿生技術，發展水資源管理、災害預警及工程決策支援方法。'
-const fullBio = computed(() => String(profile.value.short_bio || fallbackBio))
-const activeExperience = computed(() => experienceGroups.find((group) => group.key === activeExperienceGroup.value) ?? experienceGroups[0]!)
-const activeInternational = computed(() => internationalGroups.find((group) => group.key === activeInternationalGroup.value) ?? internationalGroups[0]!)
-const activeLab = computed(() => labGroups.find((group) => group.key === activeLabGroup.value) ?? labGroups[0]!)
+const fullBio = computed(() => String(profile.value.short_bio || ''))
+const emptyGroup = { key: '', title: '', shortTitle: '', label: '', number: '' }
+const activeExperience = computed(() => experienceGroups.value.find((group) => group.key === activeExperienceGroup.value) ?? experienceGroups.value[0] ?? emptyGroup)
+const activeInternational = computed(() => internationalGroups.value.find((group) => group.key === activeInternationalGroup.value) ?? internationalGroups.value[0] ?? emptyGroup)
+const activeLab = computed(() => labGroups.value.find((group) => group.key === activeLabGroup.value) ?? labGroups.value[0] ?? emptyGroup)
+const publicationTitle = (key: string) => publicationGroupLabels.value.find((group) => group.key === key)?.title || ''
 const publicationGroups = computed(() => [
   {
     key: 'journal',
-    title: '期刊論文',
+    title: publicationTitle('journal'),
     number: '01',
     items: (publicationsData.value.journal_papers || []).map((item) => ({
       id: `journal-${item.id}`,
@@ -99,7 +106,7 @@ const publicationGroups = computed(() => [
   },
   {
     key: 'conference',
-    title: '研討會論文',
+    title: publicationTitle('conference'),
     number: '02',
     items: (publicationsData.value.conference_papers || []).map((item) => ({
       id: `conference-${item.id}`,
@@ -112,7 +119,7 @@ const publicationGroups = computed(() => [
   },
   {
     key: 'other',
-    title: '專利與其他著作',
+    title: publicationTitle('other'),
     number: '03',
     items: [...(publicationsData.value.patents || []), ...(publicationsData.value.other_publications || [])].map((item) => ({
       id: `other-${item.id}-${item.patent_number || 'work'}`,
@@ -158,10 +165,10 @@ async function loadHome() {
     const response = await fetch('/api/home')
     if (!response.ok) throw new Error('API response error')
     home.value = await response.json()
-    startTyping(String(home.value.profile?.short_bio || fallbackBio))
+    startTyping(String(home.value.profile?.short_bio || ''))
   } catch {
     loadError.value = true
-    startTyping(fallbackBio)
+    startTyping('')
   } finally {
     loading.value = false
   }
@@ -215,7 +222,7 @@ function updateCurrentPageOnScroll() {
   window.requestAnimationFrame(() => {
     const marker = Math.min(180, window.innerHeight * 0.32)
     let active = 'Home'
-    for (const item of navItems) {
+    for (const item of navItems.value) {
       const section = document.getElementById(item.toLowerCase())
       if (section && section.getBoundingClientRect().top <= marker) active = item
     }
@@ -255,20 +262,24 @@ function startProjectDrag(event: PointerEvent) {
   projectPointerStart = event.clientX
   projectScrollStart = marquee.scrollLeft
   projectDragged = false
-  projectDragging.value = true
-  marquee.setPointerCapture(event.pointerId)
+  projectDragging.value = false
 }
 
 function moveProjectDrag(event: PointerEvent) {
-  if (!projectDragging.value || !projectMarquee.value) return
+  if (!projectMarquee.value || event.buttons === 0) return
   const distance = event.clientX - projectPointerStart
-  if (Math.abs(distance) > 5) projectDragged = true
+  if (Math.abs(distance) <= 5 && !projectDragged) return
+  if (!projectDragged) {
+    projectDragged = true
+    projectDragging.value = true
+    projectMarquee.value.setPointerCapture(event.pointerId)
+  }
   projectMarquee.value.scrollLeft = projectScrollStart - distance
 }
 
 function stopProjectDrag(event: PointerEvent) {
   const marquee = projectMarquee.value
-  if (!marquee || !projectDragging.value) return
+  if (!marquee) return
   projectDragging.value = false
   if (marquee.hasPointerCapture(event.pointerId)) marquee.releasePointerCapture(event.pointerId)
 }
@@ -352,7 +363,7 @@ onBeforeUnmount(() => {
   <div class="site-shell">
     <header class="topbar">
       <button class="brand" type="button" aria-label="回到首頁" @click="selectNav('Home')">
-        <img class="brand-logo" src="/starlab_logo.png" alt="STARLAB" />
+        <img class="brand-logo" src="/starlab_logo.png" :alt="settings.brand_name" />
       </button>
 
       <button class="menu-button" type="button" :aria-expanded="mobileNavOpen" @click="mobileNavOpen = !mobileNavOpen">
@@ -376,10 +387,10 @@ onBeforeUnmount(() => {
     <main id="home">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span class="status-dot"></span> Department of Water Resources Engineering and Conservation </p>
+          <p class="eyebrow"><span class="status-dot"></span> {{ settings.department_name }} </p>
           <h1 id="hero-title">
-            <span>{{ profile.name_zh || '黃振家' }}</span>
-            <strong>{{ profile.name_en || 'CHENG-CHIA HUANG' }}</strong>
+            <span>{{ profile.name_zh }}</span>
+            <strong>{{ profile.name_en }}</strong>
           </h1>
           <div class="positions">
             <span v-for="position in positions" :key="position.id as number">
@@ -532,18 +543,18 @@ onBeforeUnmount(() => {
       <section id="lab" class="content-page lab-page" aria-labelledby="lab-title">
         <header class="content-heading light">
           <p>08 / LAB</p>
-          <h2 id="lab-title">{{ labData.lab?.name || 'STARLAB' }}</h2>
+          <h2 id="lab-title">{{ labData.lab?.name }}</h2>
           <span>SEDIMENT · TECHNOLOGY · RESILIENCE</span>
         </header>
         <div class="lab-command">
-          <div class="lab-signal" aria-hidden="true"><span></span><i></i><b>STAR</b></div>
+          <div class="lab-signal" aria-hidden="true"><span></span><i></i><b>{{ settings.brand_name }}</b></div>
           <div class="lab-manifesto">
             <p class="lab-kicker">LABORATORY / ACTIVE RESEARCH BASE</p>
             <p class="lab-intro">{{ labData.lab?.description }}</p>
             <div class="lab-stats" role="tablist" aria-label="實驗室資料分類">
               <button v-for="group in labGroups" :id="`lab-tab-${group.key}`" :key="group.key" type="button" role="tab" :aria-selected="activeLabGroup === group.key" :aria-controls="`lab-panel-${group.key}`" :class="{ active: activeLabGroup === group.key }" @click="activeLabGroup = group.key">
                 <span>{{ group.number }}</span>
-                <strong>{{ group.key === 'topics' ? (labData.research_topics || []).length : group.key === 'members' ? 1 : (labData.lab_activities || []).length }}</strong>
+                <strong>{{ group.key === 'topics' ? (labData.research_topics || []).length : group.key === 'members' ? (labData.lab_members || []).length : (labData.lab_activities || []).length }}</strong>
                 {{ group.shortTitle }}
                 <small>{{ activeLabGroup === group.key ? 'OPEN' : 'VIEW' }}</small>
               </button>
@@ -555,7 +566,7 @@ onBeforeUnmount(() => {
             <article :id="`lab-panel-${activeLab.key}`" :key="activeLab.key" class="lab-panel" role="tabpanel" :aria-labelledby="`lab-tab-${activeLab.key}`">
               <header><span>{{ activeLab.number }}</span><h3>{{ activeLab.title }}</h3><small>{{ activeLab.label }}</small></header>
               <ol v-if="activeLab.key === 'topics'"><li v-for="(item, index) in labData.research_topics || []" :key="item.id as number" :style="{ '--lab-item-index': index }"><span>{{ String(index + 1).padStart(2, '0') }}</span>{{ item.topic }}</li></ol>
-              <ul v-else-if="activeLab.key === 'members'"><li v-for="item in labData.lab_members || []" :key="item.id as number">{{ item.name }}</li><li v-if="!labData.lab_members?.length">實驗室成員 1 人</li></ul>
+              <ul v-else-if="activeLab.key === 'members'"><li v-for="item in labData.lab_members || []" :key="item.id as number">{{ item.name }}</li></ul>
               <ol v-else><li v-for="(item, index) in labData.lab_activities || []" :key="item.id as number" :style="{ '--lab-item-index': index }"><span>{{ String(index + 1).padStart(2, '0') }}</span>{{ item.title }}</li></ol>
             </article>
           </Transition>
@@ -566,10 +577,10 @@ onBeforeUnmount(() => {
     <footer id="contact" class="contact">
       <div class="contact-scene" aria-hidden="true"><span class="tower"></span><span class="tree one"></span><span class="tree two"></span></div>
       <div class="contact-content">
-        <a class="email-link" :href="`mailto:${profile.email || 'cchiahuang@fcu.edu.tw'}`">{{ profile.email || 'cchiahuang@fcu.edu.tw' }} <span>↗</span></a>
-        <address>{{ profile.address || '逢甲大學　臺中市西屯區文華路100號' }}</address>
+        <a v-if="profile.email" class="email-link" :href="`mailto:${profile.email}`">{{ profile.email }} <span>↗</span></a>
+        <address>{{ profile.address }}</address>
       </div>
-      <div class="footer-line"><span>© {{ new Date().getFullYear() }} CHENG-CHIA HUANG</span><button type="button" @click="selectNav('Home')">BACK TO TOP ↑</button></div>
+      <div class="footer-line"><span>© {{ new Date().getFullYear() }} {{ settings.footer_name }}</span><button type="button" @click="selectNav('Home')">BACK TO TOP ↑</button></div>
     </footer>
 
     <Transition name="modal">

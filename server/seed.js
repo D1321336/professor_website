@@ -1,6 +1,55 @@
 import db from './db.js'
 
 db.serialize(() => {
+  const navigationItems = [
+    ['Home', 'home', 1, 1],
+    ['Research', 'research', 2, 1],
+    ['Publications', 'publications', 3, 1],
+    ['Projects', 'projects', 4, 1],
+    ['Experience', 'experience', 5, 1],
+    ['International', 'international', 6, 1],
+    ['Lab', 'lab', 7, 1],
+    ['Contact', 'contact', 8, 1],
+  ]
+  const navigationStmt = db.prepare(`
+    INSERT INTO navigation_items (name, path, sort_order, is_visible)
+    VALUES (?, ?, ?, ?)
+  `)
+  navigationItems.forEach((item) => navigationStmt.run(item))
+  navigationStmt.finalize()
+
+  const siteSettings = [
+    ['department_name', 'Department of Water Resources Engineering and Conservation'],
+    ['footer_name', 'CHENG-CHIA HUANG'],
+    ['brand_name', 'STARLAB'],
+  ]
+  const settingStmt = db.prepare(`
+    INSERT INTO site_settings (key, value) VALUES (?, ?)
+  `)
+  siteSettings.forEach((item) => settingStmt.run(item))
+  settingStmt.finalize()
+
+  const contentGroups = [
+    ['publications', 'journal', '期刊論文', '期刊論文', null, 1],
+    ['publications', 'conference', '研討會論文', '研討會論文', null, 2],
+    ['publications', 'other', '專利與其他著作', '專利與其他著作', null, 3],
+    ['experience', 'professional_service', '專業服務', '專業服務', null, 1],
+    ['experience', 'teaching', '教學與人才培育', '教學與人才培育', null, 2],
+    ['experience', 'training', '專業訓練', '專業訓練', null, 3],
+    ['international', 'visit_exchange', '國際訪問與技術交流', '訪問交流', null, 1],
+    ['international', 'approved_cooperation', '已核定國際合作', '核定合作', null, 2],
+    ['international', 'developing_cooperation', '洽談或發展中的合作', '發展合作', null, 3],
+    ['lab', 'topics', '主要研究主題', '研究主題', 'RESEARCH TOPICS', 1],
+    ['lab', 'members', '實驗室成員', '實驗室成員', 'LAB MEMBERS', 2],
+    ['lab', 'activities', '實驗室活動', '實驗室活動', 'FIELD & LAB LOG', 3],
+  ]
+  const groupStmt = db.prepare(`
+    INSERT INTO content_groups (section, key, title, short_title, label, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `)
+  contentGroups.forEach((item) => groupStmt.run(item))
+  groupStmt.finalize()
+
   // 教授基本資料
   db.run(
     `
