@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 
 type Item = Record<string, string | number | null>
 type HomeData = {
@@ -17,7 +17,7 @@ type ProjectsData = { projects?: Item[]; collaboration_projects?: Item[] }
 type ExperienceData = { experiences?: Item[]; experience_items?: Record<string, Item[]> }
 type InternationalData = { visit_exchange?: Item[]; approved_cooperation?: Item[]; developing_cooperation?: Item[] }
 type LabData = { lab?: Item; research_topics?: Item[]; lab_members?: Item[]; lab_activities?: Item[] }
-type PublicationDisplay = { id: string; title: string; year: string; meta: string; source: string; url: string }
+type PublicationDisplay = { id: string; title: string; year: string; meta: string; source: string; url: string; photo: string; photoPosition: string }
 
 const home = ref<HomeData>({})
 const about = ref<AboutData>({})
@@ -34,6 +34,19 @@ const aboutError = ref(false)
 const contentLoading = ref(true)
 const contentError = ref(false)
 const currentPage = ref('Home')
+const previewResource = new URLSearchParams(window.location.search).get('admin-preview') || ''
+const previewItemId = Number(new URLSearchParams(window.location.search).get('admin-preview-id') || 0)
+const previewItemType = new URLSearchParams(window.location.search).get('admin-preview-type') || ''
+const previewField = new URLSearchParams(window.location.search).get('admin-preview-field') || ''
+const previewSectionMap: Record<string, string> = {
+  profile: 'home', positions: 'home', research_areas: 'home', research_interests: 'home',
+  research: 'research', research_summaries: 'research',
+  journal_papers: 'publications', conference_papers: 'publications', other_publications: 'publications', patents: 'publications', other_works: 'publications',
+  projects: 'projects', collaboration_projects: 'projects',
+  experiences: 'experience', experience_items: 'experience', international_items: 'international',
+  labs: 'lab', research_topics: 'lab', lab_members: 'lab', lab_activities: 'lab',
+}
+const previewSection = previewSectionMap[previewResource] || ''
 const mobileNavOpen = ref(false)
 const notice = ref('')
 const fieldsOpen = ref(false)
@@ -102,6 +115,8 @@ const publicationGroups = computed(() => [
       meta: String(item.authors || ''),
       source: String(item.journal || ''),
       url: String(item.doi_url || ''),
+      photo: String(item.photo || ''),
+      photoPosition: String(item.photo_position || '50% 50%'),
     })),
   },
   {
@@ -115,19 +130,25 @@ const publicationGroups = computed(() => [
       meta: String(item.authors || ''),
       source: String(item.conference || ''),
       url: '',
+      photo: String(item.photo || ''),
+      photoPosition: String(item.photo_position || '50% 50%'),
     })),
   },
   {
     key: 'other',
     title: publicationTitle('other'),
     number: '03',
-    items: [...(publicationsData.value.patents || []), ...(publicationsData.value.other_publications || [])].map((item) => ({
+    items: [...(publicationsData.value.patents || []), ...(publicationsData.value.other_publications || [])]
+      .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
+      .map((item) => ({
       id: `other-${item.id}-${item.patent_number || 'work'}`,
       title: String(item.title || ''),
       year: String(item.year || ''),
       meta: String(item.patent_number || item.description || ''),
       source: String(item.inventor_or_owner || ''),
       url: '',
+      photo: '',
+      photoPosition: '50% 50%',
     })),
   },
 ])
@@ -332,12 +353,99 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-onMounted(() => {
-  loadHome()
-  loadContent()
+async function handleContentUpdate(event: StorageEvent) {
+  if (event.key !== 'site-content-updated') return
+  about.value = {}
+  await Promise.all([loadHome(), loadContent()])
+  if (aboutOpen.value || interestsOpen.value) await loadAbout()
+}
+
+async function applyAdminPreview() {
+  if (!previewSection) return
+  let target: Element | null = null
+  const recordId = previewResource === 'other_works' ? Math.floor(previewItemId / 2) : previewItemId
+  const recordIn = (selector: string) => recordId
+    ? document.querySelector(`${selector} [data-admin-record="${recordId}"]`)
+    : null
+
+  if (previewResource === 'profile' && previewField === 'full_bio') {
+    await loadAbout()
+    openAbout()
+    await nextTick()
+    target = document.querySelector('.about-window .window-copy')
+  } else if (previewResource === 'profile') {
+    target = previewField === 'short_bio' ? document.querySelector('.hero-intro') : document.querySelector('.hero-copy h1')
+  } else if (previewResource === 'research_areas') {
+    openFields()
+    await nextTick()
+    target = recordIn('[aria-labelledby="fields-title"]') || document.querySelector('[aria-labelledby="fields-title"] .field-list')
+  } else if (previewResource === 'research_interests') {
+    await loadAbout()
+    openInterests()
+    await nextTick()
+    target = recordIn('.interests-window') || document.querySelector('.interests-window .window-interest-list')
+  } else if (['journal_papers', 'conference_papers', 'other_publications', 'patents', 'other_works'].includes(previewResource)) {
+    const group = previewResource === 'journal_papers' ? 'journal' : previewResource === 'conference_papers' ? 'conference' : 'other'
+    openPublicationGroup(group)
+    await nextTick()
+    target = recordIn('.publication-window') || document.querySelector('.publication-window .publication-modal-list')
+  } else if (previewResource === 'research') {
+    const items = researchData.value.research || []
+    const item = previewItemId ? items.find((entry) => Number(entry.id) === previewItemId) : undefined
+    if (item) {
+      openDetail('research', item)
+      await nextTick()
+      target = document.querySelector('.detail-window-content')
+    } else {
+      target = document.querySelector('#research .research-card-grid')
+    }
+  } else if (previewResource === 'projects') {
+    const items = projectsData.value.projects || []
+    const item = previewItemId ? items.find((entry) => Number(entry.id) === previewItemId) : undefined
+    if (item) {
+      openDetail('project', item)
+      await nextTick()
+      target = document.querySelector('.detail-window-content')
+    } else {
+      target = document.querySelector('#projects .project-marquee')
+    }
+  } else {
+    if (previewResource === 'experience_items' && previewItemType) activeExperienceGroup.value = previewItemType
+    if (previewResource === 'international_items' && previewItemType) activeInternationalGroup.value = previewItemType
+    if (previewResource === 'research_topics') activeLabGroup.value = 'topics'
+    if (previewResource === 'lab_members') activeLabGroup.value = 'members'
+    if (previewResource === 'lab_activities') activeLabGroup.value = 'activities'
+    await nextTick()
+    if (['experience_items', 'international_items', 'research_topics', 'lab_members', 'lab_activities'].includes(previewResource)) {
+      await new Promise((resolve) => window.setTimeout(resolve, 360))
+    }
+    if (previewResource === 'positions') target = recordIn('.positions') || document.querySelector('.positions')
+    else if (previewResource === 'research_summaries') target = recordIn('#research .summary-window') || document.querySelector('#research .summary-window')
+    else if (previewResource === 'collaboration_projects') target = recordIn('#projects .collaboration-window') || document.querySelector('#projects .collaboration-window')
+    else if (previewResource === 'experiences') target = recordIn('.career-timeline') || document.querySelector('.career-timeline')
+    else if (previewResource === 'experience_items') target = recordIn('.experience-panel') || document.querySelector('.experience-panel ul')
+    else if (previewResource === 'international_items') target = recordIn('.international-panel') || document.querySelector('.international-panel .mindmap-branches')
+    else if (['research_topics', 'lab_members', 'lab_activities'].includes(previewResource)) target = recordIn('.lab-panel') || document.querySelector('.lab-panel > ol, .lab-panel > ul')
+    else if (previewResource === 'labs') {
+      if (previewField === 'name') target = document.getElementById('lab-title')
+      else if (previewField === 'description') target = document.querySelector('#lab .lab-intro')
+      else target = document.querySelector('#lab .lab-manifesto')
+    }
+    else target = previewSection === 'home' ? document.querySelector('.hero-copy') : document.getElementById(previewSection)
+  }
+
+  if (!target) target = previewSection === 'home' ? document.querySelector('.hero-copy') : document.getElementById(previewSection)
+  target?.classList.add('admin-preview-target')
+  target?.scrollIntoView({ block: 'center' })
+}
+
+onMounted(async () => {
+  await Promise.all([loadHome(), loadContent()])
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('scroll', updateCurrentPageOnScroll, { passive: true })
+  window.addEventListener('storage', handleContentUpdate)
   updateCurrentPageOnScroll()
+  await applyAdminPreview()
   publicationTimer = window.setInterval(() => {
     publicationGroups.value.forEach((group, index) => {
       const timer = window.setTimeout(() => {
@@ -351,6 +459,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('scroll', updateCurrentPageOnScroll)
+  window.removeEventListener('storage', handleContentUpdate)
   if (typingTimer) window.clearInterval(typingTimer)
   if (typingRestartTimer) window.clearTimeout(typingRestartTimer)
   if (publicationTimer) window.clearInterval(publicationTimer)
@@ -360,7 +469,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="site-shell">
+  <div class="site-shell" :class="{ 'admin-preview-mode': previewSection }">
     <header class="topbar">
       <button class="brand" type="button" aria-label="回到首頁" @click="selectNav('Home')">
         <img class="brand-logo" src="/starlab_logo.png" :alt="settings.brand_name" />
@@ -393,7 +502,7 @@ onBeforeUnmount(() => {
             <strong>{{ profile.name_en }}</strong>
           </h1>
           <div class="positions">
-            <span v-for="position in positions" :key="position.id as number">
+            <span v-for="position in positions" :key="position.id as number" :data-admin-record="position.id">
               {{ position.organization }} · {{ position.department }} · {{ position.title }}
             </span>
             <span v-if="!positions.length && !loading">資料整理中</span>
@@ -422,12 +531,13 @@ onBeforeUnmount(() => {
         </header>
         <div class="summary-window">
           <div class="mini-window-title">研究成果摘要</div>
-          <ul><li v-for="item in researchData.research_summaries || []" :key="item.id as number">{{ item.text }}</li></ul>
+          <ul><li v-for="item in researchData.research_summaries || []" :key="item.id as number" :data-admin-record="item.id">{{ item.text }}</li></ul>
         </div>
         <div class="research-card-grid">
           <button v-for="(item, index) in researchData.research || []" :key="item.id as number" class="research-card" type="button" :style="{ '--card-index': index }" @click="openDetail('research', item)">
             <span>{{ String(index + 1).padStart(2, '0') }}</span>
-            <i class="research-pixel-art" :class="`art-${(index % 5) + 1}`" aria-hidden="true"></i>
+            <img v-if="item.photo" class="research-card-photo" :src="String(item.photo)" :style="{ objectPosition: String(item.photo_position || '50% 50%') }" alt="" />
+            <i v-else class="research-pixel-art" :class="`art-${(index % 5) + 1}`" aria-hidden="true"></i>
             <h3>{{ item.title }}</h3>
             <small>OPEN DETAIL ↗</small>
           </button>
@@ -464,7 +574,7 @@ onBeforeUnmount(() => {
         </header>
         <div class="summary-window collaboration-window">
           <div class="mini-window-title">合作計畫摘要</div>
-          <ul><li v-for="item in projectsData.collaboration_projects || []" :key="item.id as number">{{ item.text }}</li></ul>
+          <ul><li v-for="item in projectsData.collaboration_projects || []" :key="item.id as number" :data-admin-record="item.id">{{ item.text }}</li></ul>
         </div>
         <div
           ref="projectMarquee"
@@ -480,7 +590,8 @@ onBeforeUnmount(() => {
           <div class="project-track">
             <div v-for="copy in 2" :key="copy" class="project-set" :aria-hidden="copy === 2 ? 'true' : undefined">
               <button v-for="(project, index) in projectsData.projects || []" :key="`${copy}-${project.id}`" class="project-strip-card" type="button" :tabindex="copy === 2 ? -1 : 0" @click="openDetail('project', project)">
-                <i class="project-card-visual" :class="`visual-${(index % 4) + 1}`" aria-hidden="true"><span></span></i>
+                <img v-if="project.photo" class="project-card-photo" :src="String(project.photo)" :style="{ objectPosition: String(project.photo_position || '50% 50%') }" alt="" />
+                <i v-else class="project-card-visual" :class="`visual-${(index % 4) + 1}`" aria-hidden="true"><span></span></i>
                 <div class="project-card-copy">
                   <p><span>{{ project.period }}</span><b>{{ project.status }}</b></p>
                   <h3>{{ project.title }}</h3>
@@ -499,7 +610,7 @@ onBeforeUnmount(() => {
           <span>CAREER · TEACHING · SERVICE</span>
         </header>
         <ol class="career-timeline" :class="{ 'is-active': currentPage === 'Experience' }">
-          <li v-for="(item, index) in experienceData.experiences || []" :key="item.id as number" :style="{ '--career-index': index }">
+          <li v-for="(item, index) in experienceData.experiences || []" :key="item.id as number" :data-admin-record="item.id" :style="{ '--career-index': index }">
             <time>{{ item.period }}</time><div><strong>{{ item.position }}</strong><p>{{ item.organization }}</p></div>
           </li>
         </ol>
@@ -512,7 +623,7 @@ onBeforeUnmount(() => {
           <Transition name="experience-swap" mode="out-in">
             <article :id="`experience-panel-${activeExperience.key}`" :key="activeExperience.key" class="experience-panel" role="tabpanel" :aria-labelledby="`experience-tab-${activeExperience.key}`">
               <header><span>{{ activeExperience.number }}</span><h3>{{ activeExperience.title }}</h3><small>{{ (experienceData.experience_items?.[activeExperience.key] || []).length }} RECORDS</small></header>
-              <ul><li v-for="(item, index) in experienceData.experience_items?.[activeExperience.key] || []" :key="item.id as number" :style="{ '--item-index': index }">{{ item.text }}</li></ul>
+              <ul><li v-for="(item, index) in experienceData.experience_items?.[activeExperience.key] || []" :key="item.id as number" :data-admin-record="item.id" :style="{ '--item-index': index }">{{ item.text }}</li></ul>
             </article>
           </Transition>
         </div>
@@ -533,7 +644,7 @@ onBeforeUnmount(() => {
           <Transition name="mindmap" mode="out-in">
             <article :id="`international-panel-${activeInternational.key}`" :key="activeInternational.key" class="international-panel" role="tabpanel" :aria-labelledby="`international-tab-${activeInternational.key}`">
               <ul class="mindmap-branches">
-                <li v-for="(item, index) in internationalData[activeInternational.key as keyof InternationalData] || []" :key="item.id as number" :style="{ '--branch-index': index }">{{ item.text }}</li>
+                <li v-for="(item, index) in internationalData[activeInternational.key as keyof InternationalData] || []" :key="item.id as number" :data-admin-record="item.id" :style="{ '--branch-index': index }">{{ item.text }}</li>
               </ul>
             </article>
           </Transition>
@@ -565,9 +676,9 @@ onBeforeUnmount(() => {
           <Transition name="lab-swap" mode="out-in">
             <article :id="`lab-panel-${activeLab.key}`" :key="activeLab.key" class="lab-panel" role="tabpanel" :aria-labelledby="`lab-tab-${activeLab.key}`">
               <header><span>{{ activeLab.number }}</span><h3>{{ activeLab.title }}</h3><small>{{ activeLab.label }}</small></header>
-              <ol v-if="activeLab.key === 'topics'"><li v-for="(item, index) in labData.research_topics || []" :key="item.id as number" :style="{ '--lab-item-index': index }"><span>{{ String(index + 1).padStart(2, '0') }}</span>{{ item.topic }}</li></ol>
-              <ul v-else-if="activeLab.key === 'members'"><li v-for="item in labData.lab_members || []" :key="item.id as number">{{ item.name }}</li></ul>
-              <ol v-else><li v-for="(item, index) in labData.lab_activities || []" :key="item.id as number" :style="{ '--lab-item-index': index }"><span>{{ String(index + 1).padStart(2, '0') }}</span>{{ item.title }}</li></ol>
+              <ol v-if="activeLab.key === 'topics'"><li v-for="(item, index) in labData.research_topics || []" :key="item.id as number" :data-admin-record="item.id" :style="{ '--lab-item-index': index }"><span>{{ String(index + 1).padStart(2, '0') }}</span>{{ item.topic }}</li></ol>
+              <ul v-else-if="activeLab.key === 'members'"><li v-for="item in labData.lab_members || []" :key="item.id as number" :data-admin-record="item.id">{{ item.name }}</li></ul>
+              <ol v-else><li v-for="(item, index) in labData.lab_activities || []" :key="item.id as number" :data-admin-record="item.id" :style="{ '--lab-item-index': index }"><span>{{ String(index + 1).padStart(2, '0') }}</span>{{ item.title }}</li></ol>
             </article>
           </Transition>
         </div>
@@ -580,7 +691,13 @@ onBeforeUnmount(() => {
         <a v-if="profile.email" class="email-link" :href="`mailto:${profile.email}`">{{ profile.email }} <span>↗</span></a>
         <address>{{ profile.address }}</address>
       </div>
-      <div class="footer-line"><span>© {{ new Date().getFullYear() }} {{ settings.footer_name }}</span><button type="button" @click="selectNav('Home')">BACK TO TOP ↑</button></div>
+      <div class="footer-line">
+        <span>© {{ new Date().getFullYear() }} {{ settings.footer_name }}</span>
+        <div class="footer-actions">
+          <a class="admin-entry" href="/admin" aria-label="前往管理員登入頁面" title="管理員登入">管理</a>
+          <button type="button" @click="selectNav('Home')">BACK TO TOP ↑</button>
+        </div>
+      </div>
     </footer>
 
     <Transition name="modal">
@@ -591,7 +708,8 @@ onBeforeUnmount(() => {
             <div class="window-controls"><button type="button" :aria-label="`關閉${selectedPublicationGroup.title}`" @click="closePublicationGroup">×</button></div>
           </header>
           <ol class="publication-modal-list">
-            <li v-for="item in selectedPublicationGroup.items" :key="item.id">
+            <li v-for="item in selectedPublicationGroup.items" :key="item.id" :data-admin-record="item.id.split('-')[1]">
+              <img v-if="item.photo" class="publication-item-photo" :src="item.photo" :style="{ objectPosition: item.photoPosition }" alt="" />
               <time>{{ item.year }}</time>
               <div><strong>{{ item.title }}</strong><p>{{ item.meta }}</p><small>{{ item.source }}</small><a v-if="item.url" :href="item.url" target="_blank" rel="noreferrer">DOI ↗</a></div>
             </li>
@@ -613,7 +731,7 @@ onBeforeUnmount(() => {
           </header>
           <div v-if="loadError" class="api-notice" role="status"><span>!</span>資料暫時無法載入。<button type="button" @click="loadHome">重新連線</button></div>
           <ol class="field-list" :class="{ loading }">
-            <li v-for="(area, index) in researchAreas" :key="area.id as number">
+            <li v-for="(area, index) in researchAreas" :key="area.id as number" :data-admin-record="area.id">
               <span>0{{ index + 1 }}</span><strong>{{ area.title }}</strong>
             </li>
             <li v-if="!researchAreas.length && !loading"><span>--</span><strong>資料整理中</strong></li>
@@ -647,7 +765,7 @@ onBeforeUnmount(() => {
           </header>
           <ul class="window-interest-list">
             <li v-if="aboutLoading"><span>--</span><strong>資料載入中...</strong></li>
-            <li v-for="(item, index) in researchInterests" v-else :key="item.id as number">
+            <li v-for="(item, index) in researchInterests" v-else :key="item.id as number" :data-admin-record="item.id">
               <span>{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ item.title }}</strong>
             </li>
             <li v-if="aboutError"><span>!!</span><strong>資料暫時無法載入</strong></li>
@@ -664,6 +782,7 @@ onBeforeUnmount(() => {
             <div class="window-controls"><button type="button" aria-label="關閉詳細資料" @click="closeDetail">×</button></div>
           </header>
           <div class="detail-window-content">
+            <img v-if="selectedDetail.photo" class="detail-photo" :src="String(selectedDetail.photo)" :style="{ objectPosition: String(selectedDetail.photo_position || '50% 50%') }" alt="" />
             <p class="detail-meta">{{ detailType === 'research' ? 'RESEARCH DETAIL' : selectedDetail.period }}</p>
             <h3>{{ selectedDetail.title }}</h3>
             <p v-if="detailType === 'research'">{{ selectedDetail.description }}</p>

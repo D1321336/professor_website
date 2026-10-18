@@ -12,9 +12,11 @@ router.get('/', (req, res) => {
       title,
       journal,
       doi_url,
+      photo,
+      photo_position,
       sort_order
     FROM journal_papers
-    ORDER BY year DESC, sort_order ASC
+    ORDER BY sort_order ASC, id ASC
   `
 
   const conferenceSql = `
@@ -24,9 +26,11 @@ router.get('/', (req, res) => {
       authors,
       title,
       conference,
+      photo,
+      photo_position,
       sort_order
     FROM conference_papers
-    ORDER BY year DESC, sort_order ASC
+    ORDER BY sort_order ASC, id ASC
   `
 
   const otherSql = `
@@ -37,7 +41,7 @@ router.get('/', (req, res) => {
       description,
       sort_order
     FROM other_publications
-    ORDER BY year DESC, sort_order ASC
+    ORDER BY sort_order ASC, id ASC
   `
 
   const patentSql = `
@@ -49,7 +53,7 @@ router.get('/', (req, res) => {
       inventor_or_owner,
       sort_order
     FROM patents
-    ORDER BY year DESC, sort_order ASC
+    ORDER BY sort_order ASC, id ASC
   `
 
   db.all(journalSql, [], (journalErr, journalPapers) => {

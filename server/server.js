@@ -9,13 +9,18 @@ import projectsRouter from './routes/projects.js'
 import experienceRouter from './routes/experience.js'
 import internationalRouter from './routes/international.js'
 import labRouter from './routes/lab.js'
+import adminRouter from './routes/admin.js'
+import { initializeAdmin } from './auth.js'
+import { initializeContentMedia } from './migrations.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 3000
 
-app.use(express.json())
+app.use(express.json({ limit: '8mb' }))
+await initializeContentMedia()
+await initializeAdmin()
 
 // Test API
 app.get('/api', (req, res) => {
@@ -33,8 +38,10 @@ app.use('/api/projects', projectsRouter)
 app.use('/api/experience', experienceRouter)
 app.use('/api/international', internationalRouter)
 app.use('/api/lab', labRouter)
+app.use('/api/admin', adminRouter)
 
 // Serve the built Vue frontend
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')))
 app.use(express.static(path.join(__dirname, '../dist')))
 
 app.get('/{*splat}', (req, res) => {

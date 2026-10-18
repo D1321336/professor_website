@@ -12,6 +12,8 @@ router.get('/', (req, res) => {
       organization,
       role,
       status,
+      photo,
+      photo_position,
       sort_order
     FROM projects
     ORDER BY sort_order ASC

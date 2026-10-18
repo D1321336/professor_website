@@ -8,8 +8,7 @@ router.get('/', (req, res) => {
     SELECT
       id,
       name,
-      description,
-      photo
+      description
     FROM labs
     LIMIT 1
   `

@@ -9,6 +9,8 @@ router.get('/', (req, res) => {
       id,
       title,
       description,
+      photo,
+      photo_position,
       sort_order
     FROM research
     ORDER BY sort_order ASC

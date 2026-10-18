@@ -41,8 +41,7 @@ db.serialize(() => {
       email TEXT,
       address TEXT,
       short_bio TEXT,
-      full_bio TEXT,
-      photo TEXT
+      full_bio TEXT
     )
   `)
 
@@ -71,8 +70,7 @@ db.serialize(() => {
     CREATE TABLE labs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
-      description TEXT,
-      photo TEXT
+      description TEXT
     )
   `)
 
@@ -91,6 +89,8 @@ db.serialize(() => {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     description TEXT,
+    photo TEXT,
+    photo_position TEXT,
     sort_order INTEGER DEFAULT 0
   );
   `)
@@ -113,6 +113,8 @@ db.serialize(() => {
     title TEXT NOT NULL,
     journal TEXT,
     doi_url TEXT,
+    photo TEXT,
+    photo_position TEXT,
     sort_order INTEGER DEFAULT 0
     );
   `)
@@ -126,6 +128,8 @@ db.serialize(() => {
     authors TEXT,
     title TEXT NOT NULL,
     conference TEXT,
+    photo TEXT,
+    photo_position TEXT,
     sort_order INTEGER DEFAULT 0
     );
   `)
@@ -162,6 +166,8 @@ db.serialize(() => {
     organization TEXT,
     role TEXT,
     status TEXT,
+    photo TEXT,
+    photo_position TEXT,
     sort_order INTEGER DEFAULT 0
     );
   `)

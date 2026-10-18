@@ -9,8 +9,7 @@ router.get('/', (req, res) => {
       id,
       name_zh,
       name_en,
-      full_bio,
-      photo
+      full_bio
     FROM profile
     LIMIT 1
   `

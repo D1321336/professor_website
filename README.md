@@ -35,6 +35,18 @@ npm install
 npm run dev
 ```
 
+Start the API in another terminal:
+
+```sh
+copy .env.example .env
+npm run server
+```
+
+Set a long, unique `ADMIN_PASSWORD` in `.env` before starting the server. The content
+management page is available at `http://localhost:5173/admin` during development and
+at `/admin` in the production build. Navigation, branding, and contact fields are not
+editable from the administration page.
+
 ### Type-Check, Compile and Minify for Production
 
 ```sh

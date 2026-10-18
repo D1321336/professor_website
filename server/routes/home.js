@@ -11,8 +11,7 @@ router.get('/', (req, res) => {
       name_en,
       email,
       address,
-      short_bio,
-      photo
+      short_bio
     FROM profile
     LIMIT 1
   `
