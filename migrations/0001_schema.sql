@@ -1,0 +1,31 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE navigation_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, path TEXT NOT NULL UNIQUE, sort_order INTEGER DEFAULT 0, is_visible INTEGER DEFAULT 1);
+CREATE TABLE site_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE content_groups (id INTEGER PRIMARY KEY AUTOINCREMENT, section TEXT NOT NULL, key TEXT NOT NULL, title TEXT NOT NULL, short_title TEXT, label TEXT, sort_order INTEGER DEFAULT 0, UNIQUE(section, key));
+CREATE TABLE profile (id INTEGER PRIMARY KEY AUTOINCREMENT, name_zh TEXT NOT NULL, name_en TEXT, email TEXT, address TEXT, short_bio TEXT, full_bio TEXT);
+CREATE TABLE positions (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, organization TEXT, department TEXT, sort_order INTEGER DEFAULT 0);
+CREATE TABLE research_areas (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, sort_order INTEGER DEFAULT 0);
+CREATE TABLE labs (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT);
+CREATE TABLE research_interests (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, sort_order INTEGER DEFAULT 0);
+CREATE TABLE research (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT, photo TEXT, photo_position TEXT, sort_order INTEGER DEFAULT 0);
+CREATE TABLE research_summaries (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, sort_order INTEGER DEFAULT 0);
+CREATE TABLE journal_papers (id INTEGER PRIMARY KEY AUTOINCREMENT, year INTEGER, authors TEXT, title TEXT NOT NULL, journal TEXT, doi_url TEXT, photo TEXT, photo_position TEXT, sort_order INTEGER DEFAULT 0);
+CREATE TABLE conference_papers (id INTEGER PRIMARY KEY AUTOINCREMENT, year INTEGER, authors TEXT, title TEXT NOT NULL, conference TEXT, photo TEXT, photo_position TEXT, sort_order INTEGER DEFAULT 0);
+CREATE TABLE other_publications (id INTEGER PRIMARY KEY AUTOINCREMENT, year INTEGER, title TEXT NOT NULL, description TEXT, sort_order INTEGER DEFAULT 0);
+CREATE TABLE patents (id INTEGER PRIMARY KEY AUTOINCREMENT, year INTEGER, title TEXT NOT NULL, patent_number TEXT, inventor_or_owner TEXT, sort_order INTEGER DEFAULT 0);
+CREATE TABLE projects (id INTEGER PRIMARY KEY AUTOINCREMENT, period TEXT, title TEXT NOT NULL, organization TEXT, role TEXT, status TEXT, photo TEXT, photo_position TEXT, sort_order INTEGER DEFAULT 0);
+CREATE TABLE collaboration_projects (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, sort_order INTEGER DEFAULT 0);
+CREATE TABLE experiences (id INTEGER PRIMARY KEY AUTOINCREMENT, period TEXT, organization TEXT NOT NULL, position TEXT, sort_order INTEGER DEFAULT 0);
+CREATE TABLE experience_items (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, text TEXT NOT NULL, sort_order INTEGER DEFAULT 0);
+CREATE TABLE international_items (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, text TEXT NOT NULL, sort_order INTEGER DEFAULT 0);
+CREATE TABLE lab_members (id INTEGER PRIMARY KEY AUTOINCREMENT, lab_id INTEGER NOT NULL, name TEXT NOT NULL, sort_order INTEGER DEFAULT 0, FOREIGN KEY (lab_id) REFERENCES labs(id) ON DELETE CASCADE);
+CREATE TABLE research_topics (id INTEGER PRIMARY KEY AUTOINCREMENT, lab_id INTEGER NOT NULL, topic TEXT NOT NULL, sort_order INTEGER DEFAULT 0, FOREIGN KEY (lab_id) REFERENCES labs(id) ON DELETE CASCADE);
+CREATE TABLE lab_activities (id INTEGER PRIMARY KEY AUTOINCREMENT, lab_id INTEGER NOT NULL, title TEXT NOT NULL, sort_order INTEGER DEFAULT 0, FOREIGN KEY (lab_id) REFERENCES labs(id) ON DELETE CASCADE);
+CREATE TABLE login_attempts (ip TEXT PRIMARY KEY, attempts INTEGER NOT NULL, window_started_at INTEGER NOT NULL);
+
+CREATE INDEX experience_items_type_order_idx ON experience_items(type, sort_order);
+CREATE INDEX international_items_type_order_idx ON international_items(type, sort_order);
+CREATE INDEX lab_members_lab_order_idx ON lab_members(lab_id, sort_order);
+CREATE INDEX research_topics_lab_order_idx ON research_topics(lab_id, sort_order);
+CREATE INDEX lab_activities_lab_order_idx ON lab_activities(lab_id, sort_order);

@@ -13,7 +13,13 @@
     "lint": "run-s \"lint:*\"",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
-    "format": "prettier --write --experimental-cli src/"
+    "format": "prettier --write --experimental-cli src/",
+    "cf:dev": "npm run build && wrangler dev",
+    "cf:deploy": "npm run build && wrangler deploy",
+    "cf:migrate:local": "wrangler d1 migrations apply professor-website-db --local",
+    "cf:migrate:remote": "wrangler d1 migrations apply professor-website-db --remote",
+    "cf:export": "node scripts/export-d1-data.mjs",
+    "cf:upload-media": "node scripts/upload-r2-media.mjs"
   },
   "dependencies": {
     "express": "^5.2.1",
@@ -39,7 +45,8 @@
     "vite": "^8.2.2",
     "vite-plugin-vue-devtools": "^8.2.1",
     "vue-eslint-parser": "^10.4.1",
-    "vue-tsc": "^3.3.11"
+    "vue-tsc": "^3.3.11",
+    "wrangler": "^4.45.0"
   },
   "engines": {
     "node": "24.x"

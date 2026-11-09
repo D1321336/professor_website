@@ -9,6 +9,7 @@ type HomeData = {
   navigation_items?: Item[]
   settings?: Record<string, string>
   content_groups?: Item[]
+  latest_news?: Item[]
 }
 type AboutData = { profile?: Item; research_interests?: Item[] }
 type ResearchData = { research?: Item[]; research_summaries?: Item[] }
@@ -18,6 +19,7 @@ type ExperienceData = { experiences?: Item[]; experience_items?: Record<string, 
 type InternationalData = { visit_exchange?: Item[]; approved_cooperation?: Item[]; developing_cooperation?: Item[] }
 type LabData = { lab?: Item; research_topics?: Item[]; lab_members?: Item[]; lab_activities?: Item[] }
 type PublicationDisplay = { id: string; title: string; year: string; meta: string; source: string; url: string; photo: string; photoPosition: string }
+type ImagePreview = { title: string; photo: string }
 
 const home = ref<HomeData>({})
 const about = ref<AboutData>({})
@@ -54,6 +56,7 @@ const aboutOpen = ref(false)
 const interestsOpen = ref(false)
 const detailOpen = ref(false)
 const publicationOpen = ref(false)
+const enlargedPublicationPhoto = ref<ImagePreview | null>(null)
 const selectedPublicationKey = ref('journal')
 const publicationIndexes = ref<Record<string, number>>({ journal: 0, conference: 0, other: 0 })
 const detailType = ref<'research' | 'project'>('research')
@@ -98,6 +101,25 @@ const aboutParagraphs = computed(() => {
   return text ? text.split(/\r?\n/).filter(Boolean) : []
 })
 const fullBio = computed(() => String(profile.value.short_bio || ''))
+const researchMetrics = computed(() => [
+  [String((publicationsData.value.journal_papers || []).length), '期刊論文'],
+  [String((publicationsData.value.conference_papers || []).length), '研討會論文'],
+  [String((publicationsData.value.patents || []).length), '發明專利'],
+  [String((projectsData.value.projects || []).length), '主持計畫'],
+  ['25', '受邀演講'],
+  ['60+', '期刊審稿'],
+])
+const academicLinks = [
+  ['Google Scholar', 'https://scholar.google.com/scholar?q=%22Cheng-Chia+Huang%22+%22Feng+Chia+University%22'],
+  ['ORCID', 'https://orcid.org/orcid-search/search?searchQuery=Cheng-Chia%20Huang'],
+  ['Scopus', 'https://www.scopus.com/search/form.uri?display=authorLookup'],
+  ['ResearchGate', 'https://www.researchgate.net/scientific-contributions/Cheng-Chia-Huang-2155557449'],
+]
+const latestNewsRows = computed(() => {
+  const rows = [...(home.value.latest_news || [])]
+  while (rows.length < 3) rows.push({ id: -rows.length - 1, news_date: '—', category: '', title: '尚無最新消息', content: null, photo: null, url: null })
+  return rows.slice(0, 3)
+})
 const emptyGroup = { key: '', title: '', shortTitle: '', label: '', number: '' }
 const activeExperience = computed(() => experienceGroups.value.find((group) => group.key === activeExperienceGroup.value) ?? experienceGroups.value[0] ?? emptyGroup)
 const activeInternational = computed(() => internationalGroups.value.find((group) => group.key === activeInternationalGroup.value) ?? internationalGroups.value[0] ?? emptyGroup)
@@ -280,6 +302,10 @@ function startProjectDrag(event: PointerEvent) {
   if (event.pointerType === 'mouse' && event.button !== 0) return
   const marquee = projectMarquee.value
   if (!marquee) return
+  const set = marquee.querySelector<HTMLElement>('.project-set')
+  const loopWidth = set ? set.offsetWidth + 18 : 0
+  if (loopWidth && marquee.scrollLeft < loopWidth * 0.5) marquee.scrollLeft += loopWidth
+  else if (loopWidth && marquee.scrollLeft > loopWidth * 1.5) marquee.scrollLeft -= loopWidth
   projectPointerStart = event.clientX
   projectScrollStart = marquee.scrollLeft
   projectDragged = false
@@ -287,15 +313,26 @@ function startProjectDrag(event: PointerEvent) {
 }
 
 function moveProjectDrag(event: PointerEvent) {
-  if (!projectMarquee.value || event.buttons === 0) return
+  const marquee = projectMarquee.value
+  if (!marquee || event.buttons === 0) return
   const distance = event.clientX - projectPointerStart
   if (Math.abs(distance) <= 5 && !projectDragged) return
   if (!projectDragged) {
     projectDragged = true
     projectDragging.value = true
-    projectMarquee.value.setPointerCapture(event.pointerId)
+    marquee.setPointerCapture(event.pointerId)
   }
-  projectMarquee.value.scrollLeft = projectScrollStart - distance
+  marquee.scrollLeft = projectScrollStart - distance
+
+  const set = marquee.querySelector<HTMLElement>('.project-set')
+  const loopWidth = set ? set.offsetWidth + 18 : 0
+  if (loopWidth && marquee.scrollLeft < loopWidth * 0.5) {
+    marquee.scrollLeft += loopWidth
+    projectScrollStart += loopWidth
+  } else if (loopWidth && marquee.scrollLeft > loopWidth * 1.5) {
+    marquee.scrollLeft -= loopWidth
+    projectScrollStart -= loopWidth
+  }
 }
 
 function stopProjectDrag(event: PointerEvent) {
@@ -340,11 +377,31 @@ function openPublicationGroup(key: string) {
 
 function closePublicationGroup() {
   publicationOpen.value = false
+  enlargedPublicationPhoto.value = null
   document.body.classList.remove('modal-open')
+}
+
+function openPublicationPhoto(item: PublicationDisplay) {
+  enlargedPublicationPhoto.value = item
+}
+
+function openDetailPhoto(item: Item) {
+  enlargedPublicationPhoto.value = {
+    title: String(item.title || ''),
+    photo: String(item.photo || ''),
+  }
+}
+
+function closePublicationPhoto() {
+  enlargedPublicationPhoto.value = null
 }
 
 function handleKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
+    if (enlargedPublicationPhoto.value) {
+      closePublicationPhoto()
+      return
+    }
     closeFields()
     closeAbout()
     closeInterests()
@@ -495,7 +552,10 @@ onBeforeUnmount(() => {
 
     <main id="home">
       <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-copy">
+        <div class="home-overview-window">
+          <div class="overview-titlebar"><span>HOME / PROFESSOR PROFILE</span><i aria-hidden="true"></i></div>
+          <div class="overview-main">
+            <div class="hero-copy">
           <p class="eyebrow"><span class="status-dot"></span> {{ settings.department_name }} </p>
           <h1 id="hero-title">
             <span>{{ profile.name_zh }}</span>
@@ -515,6 +575,13 @@ onBeforeUnmount(() => {
             <button class="pixel-button primary" type="button" @click="openFields">研究領域 </button>
             <button class="pixel-button primary" type="button" @click="openInterests">研究興趣</button>
           </div>
+            </div>
+            <div class="overview-metrics" aria-label="研究數據">
+              <article v-for="metric in researchMetrics" :key="metric[1]"><strong>{{ metric[0] }}</strong><span>{{ metric[1] }}</span></article>
+            </div>
+          </div>
+          <section class="overview-links" aria-labelledby="academic-links-title"><h2 id="academic-links-title">學術連結 <small>ACADEMIC LINKS</small></h2><nav><a v-for="link in academicLinks" :key="link[0]" :href="link[1]" target="_blank" rel="noreferrer">{{ link[0] }} <span>↗</span></a></nav></section>
+          <section class="overview-news" aria-labelledby="latest-news-title"><header><h2 id="latest-news-title">最新消息 <small>LATEST NEWS</small></h2><span>最新 3 則</span></header><div><article v-for="item in latestNewsRows" :key="item.id as number"><time>{{ item.news_date }}</time><span v-if="item.category">{{ item.category }}</span><strong>{{ item.title }}</strong><a v-if="item.url" :href="String(item.url)" target="_blank" rel="noreferrer" aria-label="閱讀消息">↗</a></article></div></section>
         </div>
 
       </section>
@@ -576,27 +643,13 @@ onBeforeUnmount(() => {
           <div class="mini-window-title">合作計畫摘要</div>
           <ul><li v-for="item in projectsData.collaboration_projects || []" :key="item.id as number" :data-admin-record="item.id">{{ item.text }}</li></ul>
         </div>
-        <div
-          ref="projectMarquee"
-          class="project-marquee"
-          :class="{ 'is-dragging': projectDragging }"
-          aria-label="研究計畫輪播，移入可暫停，按住可左右拖曳"
-          @pointerdown="startProjectDrag"
-          @pointermove="moveProjectDrag"
-          @pointerup="stopProjectDrag"
-          @pointercancel="stopProjectDrag"
-          @click.capture="guardProjectClick"
-        >
+        <div ref="projectMarquee" class="project-marquee" :class="{ 'is-dragging': projectDragging }" aria-label="研究計畫輪播，移入可暫停，按住可左右拖曳" @pointerdown="startProjectDrag" @pointermove="moveProjectDrag" @pointerup="stopProjectDrag" @pointercancel="stopProjectDrag" @click.capture="guardProjectClick">
           <div class="project-track">
-            <div v-for="copy in 2" :key="copy" class="project-set" :aria-hidden="copy === 2 ? 'true' : undefined">
-              <button v-for="(project, index) in projectsData.projects || []" :key="`${copy}-${project.id}`" class="project-strip-card" type="button" :tabindex="copy === 2 ? -1 : 0" @click="openDetail('project', project)">
+            <div v-for="copy in 3" :key="copy" class="project-set" :aria-hidden="copy !== 1 ? 'true' : undefined">
+              <button v-for="(project, index) in projectsData.projects || []" :key="`${copy}-${project.id}`" class="project-strip-card" type="button" :tabindex="copy !== 1 ? -1 : 0" @click="openDetail('project', project)">
                 <img v-if="project.photo" class="project-card-photo" :src="String(project.photo)" :style="{ objectPosition: String(project.photo_position || '50% 50%') }" alt="" />
                 <i v-else class="project-card-visual" :class="`visual-${(index % 4) + 1}`" aria-hidden="true"><span></span></i>
-                <div class="project-card-copy">
-                  <p><span>{{ project.period }}</span><b>{{ project.status }}</b></p>
-                  <h3>{{ project.title }}</h3>
-                  <small>VIEW PROJECT ↗</small>
-                </div>
+                <div class="project-card-copy"><p><span>{{ project.period }}</span><b>{{ project.status }}</b></p><h3>{{ project.title }}</h3><small>VIEW PROJECT ↗</small></div>
               </button>
             </div>
           </div>
@@ -637,17 +690,9 @@ onBeforeUnmount(() => {
         </header>
         <div class="international-explorer">
           <div class="international-orbits" role="tablist" aria-label="國際交流分類">
-            <button v-for="group in internationalGroups" :id="`international-tab-${group.key}`" :key="group.key" type="button" role="tab" :aria-selected="activeInternationalGroup === group.key" :aria-controls="`international-panel-${group.key}`" :class="{ active: activeInternationalGroup === group.key }" @click="activeInternationalGroup = group.key">
-              <span>{{ group.number }}</span><strong>{{ group.shortTitle }}</strong>
-            </button>
+            <button v-for="group in internationalGroups" :id="`international-tab-${group.key}`" :key="group.key" type="button" role="tab" :aria-selected="activeInternationalGroup === group.key" :aria-controls="`international-panel-${group.key}`" :class="{ active: activeInternationalGroup === group.key }" @click="activeInternationalGroup = group.key"><span>{{ group.number }}</span><strong>{{ group.shortTitle }}</strong></button>
           </div>
-          <Transition name="mindmap" mode="out-in">
-            <article :id="`international-panel-${activeInternational.key}`" :key="activeInternational.key" class="international-panel" role="tabpanel" :aria-labelledby="`international-tab-${activeInternational.key}`">
-              <ul class="mindmap-branches">
-                <li v-for="(item, index) in internationalData[activeInternational.key as keyof InternationalData] || []" :key="item.id as number" :data-admin-record="item.id" :style="{ '--branch-index': index }">{{ item.text }}</li>
-              </ul>
-            </article>
-          </Transition>
+          <Transition name="mindmap" mode="out-in"><article :id="`international-panel-${activeInternational.key}`" :key="activeInternational.key" class="international-panel" role="tabpanel" :aria-labelledby="`international-tab-${activeInternational.key}`"><ul class="mindmap-branches"><li v-for="(item, index) in internationalData[activeInternational.key as keyof InternationalData] || []" :key="item.id as number" :data-admin-record="item.id" :style="{ '--branch-index': index }">{{ item.text }}</li></ul></article></Transition>
         </div>
       </section>
 
@@ -677,12 +722,13 @@ onBeforeUnmount(() => {
             <article :id="`lab-panel-${activeLab.key}`" :key="activeLab.key" class="lab-panel" role="tabpanel" :aria-labelledby="`lab-tab-${activeLab.key}`">
               <header><span>{{ activeLab.number }}</span><h3>{{ activeLab.title }}</h3><small>{{ activeLab.label }}</small></header>
               <ol v-if="activeLab.key === 'topics'"><li v-for="(item, index) in labData.research_topics || []" :key="item.id as number" :data-admin-record="item.id" :style="{ '--lab-item-index': index }"><span>{{ String(index + 1).padStart(2, '0') }}</span>{{ item.topic }}</li></ol>
-              <ul v-else-if="activeLab.key === 'members'"><li v-for="item in labData.lab_members || []" :key="item.id as number" :data-admin-record="item.id">{{ item.name }}</li></ul>
+              <ul v-else-if="activeLab.key === 'members'" class="lab-member-list"><li v-for="item in labData.lab_members || []" :key="item.id as number" class="lab-member-item" :data-admin-record="item.id">{{ item.name }}</li></ul>
               <ol v-else><li v-for="(item, index) in labData.lab_activities || []" :key="item.id as number" :data-admin-record="item.id" :style="{ '--lab-item-index': index }"><span>{{ String(index + 1).padStart(2, '0') }}</span>{{ item.title }}</li></ol>
             </article>
           </Transition>
         </div>
       </section>
+
     </main>
 
     <footer id="contact" class="contact">
@@ -694,7 +740,6 @@ onBeforeUnmount(() => {
       <div class="footer-line">
         <span>© {{ new Date().getFullYear() }} {{ settings.footer_name }}</span>
         <div class="footer-actions">
-          <a class="admin-entry" href="/admin" aria-label="前往管理員登入頁面" title="管理員登入">管理</a>
           <button type="button" @click="selectNav('Home')">BACK TO TOP ↑</button>
         </div>
       </div>
@@ -709,11 +754,28 @@ onBeforeUnmount(() => {
           </header>
           <ol class="publication-modal-list">
             <li v-for="item in selectedPublicationGroup.items" :key="item.id" :data-admin-record="item.id.split('-')[1]">
-              <img v-if="item.photo" class="publication-item-photo" :src="item.photo" :style="{ objectPosition: item.photoPosition }" alt="" />
+              <div v-if="item.photo" class="publication-item-visual">
+                <img class="publication-item-photo" :src="item.photo" :style="{ objectPosition: item.photoPosition }" alt="" />
+                <button class="image-zoom-button" type="button" aria-label="放大圖片" title="放大圖片" @click="openPublicationPhoto(item)">⛶</button>
+              </div>
               <time>{{ item.year }}</time>
-              <div><strong>{{ item.title }}</strong><p>{{ item.meta }}</p><small>{{ item.source }}</small><a v-if="item.url" :href="item.url" target="_blank" rel="noreferrer">DOI ↗</a></div>
+              <div>
+                <strong>{{ item.title }}</strong><p>{{ item.meta }}</p><small>{{ item.source }}</small>
+                <div class="publication-item-actions">
+                  <a v-if="item.url" :href="item.url" target="_blank" rel="noreferrer">DOI ↗</a>
+                </div>
+              </div>
             </li>
           </ol>
+        </section>
+      </div>
+    </Transition>
+
+    <Transition name="modal">
+      <div v-if="enlargedPublicationPhoto" class="publication-photo-backdrop" role="presentation" @mousedown.self="closePublicationPhoto">
+        <section class="publication-photo-dialog" role="dialog" aria-modal="true" :aria-label="`${enlargedPublicationPhoto.title} 圖片預覽`">
+          <button type="button" aria-label="關閉圖片預覽" @click="closePublicationPhoto">×</button>
+          <img :src="enlargedPublicationPhoto.photo" :alt="`${enlargedPublicationPhoto.title} 圖片`" />
         </section>
       </div>
     </Transition>
@@ -782,7 +844,11 @@ onBeforeUnmount(() => {
             <div class="window-controls"><button type="button" aria-label="關閉詳細資料" @click="closeDetail">×</button></div>
           </header>
           <div class="detail-window-content">
-            <img v-if="selectedDetail.photo" class="detail-photo" :src="String(selectedDetail.photo)" :style="{ objectPosition: String(selectedDetail.photo_position || '50% 50%') }" alt="" />
+            <div v-if="selectedDetail.photo && detailType === 'project'" class="detail-photo-wrap">
+              <img class="detail-photo" :src="String(selectedDetail.photo)" :style="{ objectPosition: String(selectedDetail.photo_position || '50% 50%') }" alt="" />
+              <button class="image-zoom-button" type="button" aria-label="放大圖片" title="放大圖片" @click="openDetailPhoto(selectedDetail)">⛶</button>
+            </div>
+            <img v-else-if="selectedDetail.photo" class="detail-photo" :src="String(selectedDetail.photo)" :style="{ objectPosition: String(selectedDetail.photo_position || '50% 50%') }" alt="" />
             <p class="detail-meta">{{ detailType === 'research' ? 'RESEARCH DETAIL' : selectedDetail.period }}</p>
             <h3>{{ selectedDetail.title }}</h3>
             <p v-if="detailType === 'research'">{{ selectedDetail.description }}</p>

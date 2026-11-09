@@ -24,6 +24,10 @@ const form = ref<Row>({})
 const activeField = ref('')
 const draggingId = ref<number | null>(null)
 const orderBeforeDrag = ref<number[]>([])
+const accountOpen = ref(false)
+const accountMode = ref<'password' | 'add'>('password')
+const accountForm = ref({ currentPassword: '', newPassword: '', confirmPassword: '', username: '', password: '' })
+const accounts = ref<Array<{ id: number; username: string }>>([])
 
 const activeResource = computed(() => resources.value.find((item) => item.key === activeKey.value))
 const resourceApiKey = computed(() => activeResource.value?.apiKey || activeKey.value)
@@ -220,27 +224,79 @@ async function uploadImage(event: Event, fieldName: string) {
   if (!file) return
   activeField.value = fieldName
   error.value = ''
-  if (file.size > 5 * 1024 * 1024) {
-    error.value = '圖片大小不可超過 5 MB'
+  if (file.size > 20 * 1024 * 1024) {
+    error.value = '原始圖片大小不可超過 20 MB'
     input.value = ''
     return
   }
   uploadingField.value = fieldName
   try {
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(String(reader.result || ''))
-      reader.onerror = () => reject(new Error('無法讀取圖片'))
-      reader.readAsDataURL(file)
-    })
+    const dataUrl = file.type === 'image/gif' ? await readFile(file) : await compressImage(file)
     const data = dataUrl.split(',')[1] || ''
-    const result = await api('/upload', { method: 'POST', body: JSON.stringify({ mimeType: file.type, data }) })
+    const mimeType = dataUrl.slice(5, dataUrl.indexOf(';'))
+    const result = await api('/upload', { method: 'POST', body: JSON.stringify({ mimeType, data }) })
     form.value[fieldName] = result.path
   } catch (uploadError) {
     error.value = uploadError instanceof Error ? uploadError.message : '圖片上傳失敗'
   } finally {
     uploadingField.value = ''
     input.value = ''
+  }
+}
+
+function readFile(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('無法讀取圖片'))
+    reader.readAsDataURL(file)
+  })
+}
+
+async function compressImage(file: File) {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, 1600 / bitmap.width)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  let quality = .84
+  let blob: Blob | null = null
+  do {
+    blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', quality))
+    quality -= .08
+  } while (blob && blob.size > 350 * 1024 && quality >= .44)
+  if (!blob) throw new Error('瀏覽器無法壓縮這張圖片')
+  return readFile(new File([blob], 'compressed.webp', { type: 'image/webp' }))
+}
+
+async function openAccount(mode: 'password' | 'add') {
+  accountMode.value = mode
+  accountForm.value = { currentPassword: '', newPassword: '', confirmPassword: '', username: '', password: '' }
+  error.value = ''
+  accounts.value = await api('/accounts')
+  accountOpen.value = true
+}
+
+async function saveAccount() {
+  saving.value = true
+  error.value = ''
+  try {
+    if (accountMode.value === 'password') {
+      if (accountForm.value.newPassword !== accountForm.value.confirmPassword) throw new Error('兩次輸入的新密碼不一致')
+      await api('/account/password', { method: 'PUT', body: JSON.stringify(accountForm.value) })
+      notice.value = '密碼已更新'
+    } else {
+      await api('/accounts', { method: 'POST', body: JSON.stringify(accountForm.value) })
+      notice.value = '管理員帳號已新增'
+    }
+    accountOpen.value = false
+    window.setTimeout(() => { notice.value = '' }, 3000)
+  } catch (accountError) {
+    error.value = accountError instanceof Error ? accountError.message : '帳號設定失敗'
+  } finally {
+    saving.value = false
   }
 }
 
@@ -397,7 +453,7 @@ onMounted(restoreSession)
             </button>
           </section>
         </nav>
-        <div class="admin-account"><span>{{ currentUser }}</span><button @click="logout()">登出</button><a href="/">查看網站 ↗</a></div>
+        <div class="admin-account"><span>{{ currentUser }}</span><button @click="openAccount('password')">修改密碼</button><button @click="openAccount('add')">新增管理員</button><button @click="logout()">登出</button><a href="/">查看網站 ↗</a></div>
       </aside>
 
       <section class="admin-content">
@@ -443,7 +499,7 @@ onMounted(restoreSession)
                 <img v-if="form[field.name]" :class="imagePreviewClass" :src="String(form[field.name])" :alt="`${field.label}預覽`" :style="{ objectPosition: String(form.photo_position || '50% 50%') }" />
                 <div v-else class="admin-image-placeholder">尚未上傳照片</div>
                 <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" :disabled="uploadingField === field.name" @focus="activeField = field.name" @change="uploadImage($event, field.name)" />
-                <small>支援 JPG、PNG、WebP、GIF，檔案上限 5 MB</small>
+                <small>JPG／PNG／WebP 會自動縮至 1600px 內並轉為 WebP；原檔上限 20 MB</small>
                 <div v-if="form[field.name]" class="admin-position-controls">
                   <label><span>水平位置</span><input type="range" min="0" max="100" :value="photoPositionPart(0)" @input="setPhotoPosition(0, $event)" /></label>
                   <label><span>垂直位置</span><input type="range" min="0" max="100" :value="photoPositionPart(1)" @input="setPhotoPosition(1, $event)" /></label>
@@ -463,6 +519,26 @@ onMounted(restoreSession)
             <iframe :key="editorPreviewUrl" :src="editorPreviewUrl" :title="`${activeResource.label}目前網站預覽`" />
           </aside>
         </div>
+      </section>
+    </div>
+
+    <div v-if="accountOpen" class="admin-modal-backdrop" @mousedown.self="accountOpen = false">
+      <section class="admin-account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title">
+        <header><div><p class="admin-eyebrow">ACCOUNT SECURITY</p><h2 id="account-title">{{ accountMode === 'password' ? '修改我的密碼' : '新增管理員帳號' }}</h2></div><button class="admin-close" aria-label="關閉" @click="accountOpen = false">×</button></header>
+        <p class="admin-hint">目前管理員：{{ accounts.map((item) => item.username).join('、') }}</p>
+        <form @submit.prevent="saveAccount">
+          <template v-if="accountMode === 'password'">
+            <label>目前密碼<input v-model="accountForm.currentPassword" type="password" autocomplete="current-password" required /></label>
+            <label>新密碼<input v-model="accountForm.newPassword" type="password" minlength="12" autocomplete="new-password" required /></label>
+            <label>再次輸入新密碼<input v-model="accountForm.confirmPassword" type="password" minlength="12" autocomplete="new-password" required /></label>
+          </template>
+          <template v-else>
+            <label>新帳號<input v-model="accountForm.username" autocomplete="username" pattern="[A-Za-z0-9._-]{3,40}" required /></label>
+            <label>初始密碼<input v-model="accountForm.password" type="password" minlength="12" autocomplete="new-password" required /></label>
+          </template>
+          <p v-if="error" class="admin-error" role="alert">{{ error }}</p>
+          <div class="admin-editor-actions"><button type="button" @click="accountOpen = false">取消</button><button class="admin-primary" :disabled="saving">{{ saving ? '儲存中…' : '儲存' }}</button></div>
+        </form>
       </section>
     </div>
   </main>

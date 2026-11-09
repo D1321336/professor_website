@@ -26,7 +26,7 @@ const resources = {
   profile: {
     label: '個人介紹', singleton: true,
     fields: [
-      ['name_zh', '中文姓名', 'text', true], ['name_en', '英文姓名'],
+      ['name_zh', '中文姓名', 'text', true], ['name_en', '英文姓名'], ['email', 'Email', 'email'], ['address', '地址'],
       ['short_bio', '首頁簡介', 'textarea'], ['full_bio', '完整介紹', 'textarea'],
     ],
   },
