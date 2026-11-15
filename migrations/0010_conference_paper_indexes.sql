@@ -1,0 +1,2 @@
+ALTER TABLE conference_papers ADD COLUMN is_ei INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE conference_papers ADD COLUMN is_featured INTEGER NOT NULL DEFAULT 0;

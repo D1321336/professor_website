@@ -57,7 +57,6 @@ INSERT INTO research_summaries (id, text, sort_order) VALUES (4, '主持 18 件�
 INSERT INTO research_summaries (id, text, sort_order) VALUES (5, '共同主持 10 件計畫，協同主持 2 件計畫。', 5);
 INSERT INTO research_summaries (id, text, sort_order) VALUES (6, '指導 6 件國科會大專學生研究計畫。', 6);
 INSERT INTO research_summaries (id, text, sort_order) VALUES (7, '2009 至 2018 年間參與 37 件臺大水工試驗所研究及工程計畫。', 7);
-INSERT INTO research_summaries (id, text, sort_order) VALUES (8, 'test', 0);
 INSERT INTO journal_papers (id, year, authors, title, journal, doi_url, photo, photo_position, sort_order) VALUES (1, 2026, 'Cheng-Chia Huang and Fong-Zuo Lee', 'A comprehensive study of turbid water consolidation and influence of outlet elevation on reservoir sediment management.', 'Advances in Water Resources, 214, 105354', NULL, '/uploads/1792317349347-3005c30d-199a-489b-b562-99b67e9222d8.jpg', '50% 13%', 0);
 INSERT INTO journal_papers (id, year, authors, title, journal, doi_url, photo, photo_position, sort_order) VALUES (2, 2026, '王政為、張恩齊、黃振家*', '水庫防淤隧道之操作策略與效益評估', '農業工程學報, 72(2), 46-61', NULL, NULL, NULL, 1);
 INSERT INTO journal_papers (id, year, authors, title, journal, doi_url, photo, photo_position, sort_order) VALUES (3, 2026, 'Yee Siang Gan, Sze-Teng Liong, and Cheng-Chia Huang*', 'Using Multiple Advanced Machine Learning Approaches to Enhance Prediction and Early Warning Techniques for River Sediment Concentration in Water Supply during Short-term Typhoon Events.', 'Taiwan Water Conservancy, 74(1), 62-77', NULL, NULL, NULL, 2);
@@ -74,7 +73,6 @@ INSERT INTO journal_papers (id, year, authors, title, journal, doi_url, photo, p
 INSERT INTO journal_papers (id, year, authors, title, journal, doi_url, photo, photo_position, sort_order) VALUES (14, 2021, 'Hao-Che Ho, Yen-Ming Chiang, Che-Chi Lin, Hong-Yuan Lee, and Cheng-Chia Huang*', 'Development of an Interdisciplinary Prediction System Combining Sediment Transport Simulation and Ensemble Method.', 'Water, 13(18), 2588', NULL, NULL, NULL, 13);
 INSERT INTO journal_papers (id, year, authors, title, journal, doi_url, photo, photo_position, sort_order) VALUES (15, 2021, 'Bing-Chen Jhong, Hsi-Ting Fang, and Cheng-Chia Huang*', 'Assessment of Effective Monitoring Sites in a Reservoir Watershed by Support Vector Machine Coupled with Multi-Objective Genetic Algorithm for Sediment Flux Prediction during Typhoons.', 'Water Resources Management, 35(8), 2387-2408', NULL, NULL, NULL, 14);
 INSERT INTO journal_papers (id, year, authors, title, journal, doi_url, photo, photo_position, sort_order) VALUES (16, 2021, 'Cheng-Chia Huang, Ming-Jui Chang, Gwo-Fong Lin, Ming-Chang Wu, and Po-Hsiang Wang', 'Real-time forecasting of suspended sediment concentrations in reservoirs by the optimal integration of multiple machine learning techniques.', 'Journal of Hydrology: Regional Studies, 34, 100804', NULL, NULL, NULL, 15);
-INSERT INTO journal_papers (id, year, authors, title, journal, doi_url, photo, photo_position, sort_order) VALUES (17, 6666, 'test', 'test', 'test', 'http://test', '/uploads/1792317285989-23c51bf9-dc7a-4dd2-8ea2-c7ca10a91b7a.png', '24% 73%', 16);
 INSERT INTO conference_papers (id, year, authors, title, conference, photo, photo_position, sort_order) VALUES (1, 2026, NULL, 'Evaluating the Sediment Reduction Efficiency of Best Management Practices in A Reservoir Watershed Using the Numerical Model', 'River Flow 2026, Greece', NULL, NULL, 0);
 INSERT INTO conference_papers (id, year, authors, title, conference, photo, photo_position, sort_order) VALUES (2, 2026, NULL, 'Enhancing Reservoir Desilting Efficiency via Dual-Tunnel Synergistic Operation: A Case Study of Shimen Reservoir', 'JpGU-AGU Joint Meeting 2026, Japan', NULL, NULL, 1);
 INSERT INTO conference_papers (id, year, authors, title, conference, photo, photo_position, sort_order) VALUES (3, 2026, NULL, 'Numerical Investigation of Dam-Break Flood Propagation and Geomorphic Impacts: A Case Study of the Feitsui Reservoir, Taiwan', 'JpGU-AGU Joint Meeting 2026, Japan', NULL, NULL, 2);
@@ -103,14 +101,11 @@ INSERT INTO conference_papers (id, year, authors, title, conference, photo, phot
 INSERT INTO conference_papers (id, year, authors, title, conference, photo, photo_position, sort_order) VALUES (26, 2023, NULL, '應用問題導向學習於流體力學的 CDIO 教學模式', '2023 創新教育與教學實踐研究論壇', NULL, NULL, 25);
 INSERT INTO conference_papers (id, year, authors, title, conference, photo, photo_position, sort_order) VALUES (27, 2022, NULL, 'Estimation of the Reservoir Desiltitation Strategy', 'Particles in the Americas Conference 2022', NULL, NULL, 26);
 INSERT INTO conference_papers (id, year, authors, title, conference, photo, photo_position, sort_order) VALUES (28, 2021, NULL, '整合數值模式、小波分析與機器學習的平原地區地下水位分析', '2021 臺灣地下水資源暨水文地質學會年會', NULL, NULL, 27);
-INSERT INTO conference_papers (id, year, authors, title, conference, photo, photo_position, sort_order) VALUES (29, 0, 'test', 'test', 'test', NULL, NULL, 28);
 INSERT INTO other_publications (id, year, title, description, sort_order) VALUES (1, 2021, '臺灣產業個案教材《水庫醫生》', '佳作', 3);
-INSERT INTO other_publications (id, year, title, description, sort_order) VALUES (2, 0, 'test', 'test', 6);
 INSERT INTO patents (id, year, title, patent_number, inventor_or_owner, sort_order) VALUES (1, 2026, '水質的監測方法與系統', 'I918195', '黃振家等／逢甲大學', 0);
 INSERT INTO patents (id, year, title, patent_number, inventor_or_owner, sort_order) VALUES (2, 2025, '災害預警方法及災害預警系統', 'I873901', '黃振家／逢甲大學', 1);
 INSERT INTO patents (id, year, title, patent_number, inventor_or_owner, sort_order) VALUES (3, 2024, '水文資料分析方法及水文資料分析系統', 'I832767', '黃振家／逢甲大學', 2);
 INSERT INTO patents (id, year, title, patent_number, inventor_or_owner, sort_order) VALUES (4, 2015, '軌道式雷射光學掃描設備及方法', 'I484138', '共同發明', 4);
-INSERT INTO patents (id, year, title, patent_number, inventor_or_owner, sort_order) VALUES (5, 0, 'test', 'test', 'test', 5);
 INSERT INTO projects (id, period, title, organization, role, status, photo, photo_position, sort_order) VALUES (1, '2026/08-2027/07', '融合數位孿生之淡水河流域土砂運移決策支援系統', '國科會', '主持人', '尚未開始', NULL, NULL, 0);
 INSERT INTO projects (id, period, title, organization, role, status, photo, photo_position, sort_order) VALUES (2, '2026/07-2027/06', '小小水利工程師養成計畫', '國科會', '主持人', '執行中', NULL, NULL, 1);
 INSERT INTO projects (id, period, title, organization, role, status, photo, photo_position, sort_order) VALUES (3, '2026/06-2027/05', '非破壞性深層排水技術於坡地緊急救災之應用研究與規範建立', '國科會產學合作', '主持人', '執行中', NULL, NULL, 2);
@@ -142,7 +137,6 @@ INSERT INTO experiences (id, period, organization, position, sort_order) VALUES 
 INSERT INTO experiences (id, period, organization, position, sort_order) VALUES (5, '2018/06-2020/06', '國立臺灣大學土木工程學系', '博士後研究', 4);
 INSERT INTO experiences (id, period, organization, position, sort_order) VALUES (6, '2017/02-2017/09', 'University of Colorado Denver', '訪問學者', 5);
 INSERT INTO experiences (id, period, organization, position, sort_order) VALUES (7, '2009-2018', '國立臺灣大學水工試驗所', '博士班研究生及計畫工作人員', 6);
-INSERT INTO experiences (id, period, organization, position, sort_order) VALUES (8, 'test', 'test', 'test', 7);
 INSERT INTO experience_items (id, type, text, sort_order) VALUES (1, 'professional_service', '國際及國內期刊論文審查。', 1);
 INSERT INTO experience_items (id, type, text, sort_order) VALUES (2, 'professional_service', '碩博士學位考試及博士資格考審查。', 2);
 INSERT INTO experience_items (id, type, text, sort_order) VALUES (3, 'professional_service', '教師升等、優秀論文及產學技術審查。', 3);
@@ -161,9 +155,6 @@ INSERT INTO experience_items (id, type, text, sort_order) VALUES (15, 'training'
 INSERT INTO experience_items (id, type, text, sort_order) VALUES (16, 'training', '溫室氣體盤查主任查證員。', 4);
 INSERT INTO experience_items (id, type, text, sort_order) VALUES (17, 'training', 'Python 證照。', 5);
 INSERT INTO experience_items (id, type, text, sort_order) VALUES (18, 'training', 'NVIDIA 證照。', 6);
-INSERT INTO experience_items (id, type, text, sort_order) VALUES (19, 'professional_service', 'test', 0);
-INSERT INTO experience_items (id, type, text, sort_order) VALUES (20, 'teaching', 'test', 0);
-INSERT INTO experience_items (id, type, text, sort_order) VALUES (21, 'training', 'test', 0);
 INSERT INTO international_items (id, type, text, sort_order) VALUES (1, 'visit_exchange', '2017 年於 University of Colorado Denver 進行訪問研究。', 1);
 INSERT INTO international_items (id, type, text, sort_order) VALUES (2, 'visit_exchange', '與美國墾務局進行水庫與河川數值模式及 SRH 相關技術交流。', 2);
 INSERT INTO international_items (id, type, text, sort_order) VALUES (3, 'visit_exchange', '參與臺美水利技術引進及應用研究。', 3);
@@ -175,8 +166,6 @@ INSERT INTO international_items (id, type, text, sort_order) VALUES (8, 'develop
 INSERT INTO international_items (id, type, text, sort_order) VALUES (9, 'developing_cooperation', '京都大學防災研究所。', 2);
 INSERT INTO international_items (id, type, text, sort_order) VALUES (10, 'developing_cooperation', 'Colorado State University。', 3);
 INSERT INTO international_items (id, type, text, sort_order) VALUES (11, 'developing_cooperation', 'Adamas University。', 4);
-INSERT INTO international_items (id, type, text, sort_order) VALUES (12, 'visit_exchange', 'test', 0);
-INSERT INTO lab_members (id, lab_id, name, sort_order) VALUES (1, 1, 'test', 0);
 INSERT INTO research_topics (id, lab_id, topic, sort_order) VALUES (1, 1, '水庫與河川泥砂運移', 1);
 INSERT INTO research_topics (id, lab_id, topic, sort_order) VALUES (2, 1, '水工模型試驗', 2);
 INSERT INTO research_topics (id, lab_id, topic, sort_order) VALUES (3, 1, '數值模擬與模式驗證', 3);
@@ -185,7 +174,6 @@ INSERT INTO research_topics (id, lab_id, topic, sort_order) VALUES (5, 1, '人�
 INSERT INTO research_topics (id, lab_id, topic, sort_order) VALUES (6, 1, '洪水與泥砂災害預警', 6);
 INSERT INTO research_topics (id, lab_id, topic, sort_order) VALUES (7, 1, '流域數位孿生', 7);
 INSERT INTO research_topics (id, lab_id, topic, sort_order) VALUES (8, 1, '水資源與氣候韌性', 8);
-INSERT INTO research_topics (id, lab_id, topic, sort_order) VALUES (9, 1, 'test', 9);
 INSERT INTO lab_activities (id, lab_id, title, sort_order) VALUES (1, 1, '水工模型試驗', 1);
 INSERT INTO lab_activities (id, lab_id, title, sort_order) VALUES (2, 1, '現地調查與量測', 2);
 INSERT INTO lab_activities (id, lab_id, title, sort_order) VALUES (3, 1, '研討會及研究成果發表', 3);

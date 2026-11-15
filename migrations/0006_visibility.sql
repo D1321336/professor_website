@@ -1,0 +1,36 @@
+-- Existing content remains published; the admin UI creates new records as drafts.
+ALTER TABLE profile ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE positions ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE research_areas ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE labs ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE research_interests ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE research ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE research_summaries ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE journal_papers ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE conference_papers ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE other_publications ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE patents ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE projects ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE collaboration_projects ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE experiences ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE experience_items ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE international_items ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE lab_members ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE research_topics ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE lab_activities ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE academic_links ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE honors ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE news ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE invited_talks ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE review_stats ADD COLUMN visibility TEXT NOT NULL DEFAULT 'published';
+
+UPDATE research_summaries SET visibility = 'hidden' WHERE lower(text) = 'test';
+UPDATE journal_papers SET visibility = 'hidden' WHERE year = 6666 OR lower(coalesce(authors, '') || ' ' || title) LIKE '%test%';
+UPDATE conference_papers SET visibility = 'hidden' WHERE year = 0 AND lower(coalesce(authors, '') || ' ' || title) LIKE '%test%';
+UPDATE other_publications SET visibility = 'hidden' WHERE year = 0 AND lower(coalesce(title, '') || ' ' || coalesce(description, '')) LIKE '%test%';
+UPDATE patents SET visibility = 'hidden' WHERE year = 0 AND lower(coalesce(title, '') || ' ' || coalesce(patent_number, '')) LIKE '%test%';
+UPDATE experiences SET visibility = 'hidden' WHERE lower(coalesce(period, '') || ' ' || organization || ' ' || coalesce(position, '')) LIKE '%test%';
+UPDATE experience_items SET visibility = 'hidden' WHERE lower(text) = 'test';
+UPDATE international_items SET visibility = 'hidden' WHERE lower(text) = 'test';
+UPDATE lab_members SET visibility = 'hidden' WHERE lower(name) = 'test';
+UPDATE research_topics SET visibility = 'hidden' WHERE lower(topic) = 'test';

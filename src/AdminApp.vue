@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 
 type FieldOption = { value: string; label: string }
 type Field = { name: string; label: string; type: string; required: boolean; options?: FieldOption[] }
-type Resource = { key: string; label: string; singleton: boolean; sortable?: boolean; fields: Field[]; apiKey?: string; filterType?: string }
+type Resource = { key: string; label: string; singleton: boolean; sortable?: boolean; fields: Field[]; apiKey?: string; filterType?: string; filterField?: string; filterValue?: string }
 type Row = Record<string, string | number | null>
 
 const token = ref(sessionStorage.getItem('admin-token') || '')
@@ -36,15 +36,19 @@ const sortableResourceKeys = new Set([
   'journal_papers', 'conference_papers', 'other_publications', 'patents', 'projects',
   'other_works',
   'collaboration_projects', 'experiences', 'experience_items', 'international_items',
+  'international_conferences', 'research_stats',
   'experience_professional_service', 'experience_teaching', 'experience_training',
-  'international_visit_exchange', 'international_approved_cooperation', 'international_developing_cooperation',
+  'international_visit_exchange', 'international_approved_cooperation', 'international_developing_cooperation', 'international_notes',
   'research_topics', 'lab_members', 'lab_activities',
 ])
 const reorderable = computed(() => activeResource.value?.sortable ?? sortableResourceKeys.has(activeKey.value))
-const timeField = computed(() => activeResource.value?.fields.find((field) => field.name === 'year' || field.name === 'period')?.name || '')
+const timeField = computed(() => activeKey.value === 'projects'
+  ? 'start_date'
+  : activeResource.value?.fields.find((field) => field.name === 'year' || field.name === 'period')?.name || '')
 const previewUrl = computed(() => {
   const params = new URLSearchParams({ 'admin-preview': resourceApiKey.value })
   if (activeResource.value?.filterType) params.set('admin-preview-type', activeResource.value.filterType)
+  if (activeResource.value?.key === 'international_notes') params.set('admin-preview-type', 'note')
   return `/?${params.toString()}`
 })
 const imagePreviewClass = computed(() => {
@@ -57,17 +61,20 @@ const editorPreviewUrl = computed(() => {
   const params = new URLSearchParams({ 'admin-preview': resourceApiKey.value })
   if (editingId.value != null) params.set('admin-preview-id', String(editingId.value))
   if (activeResource.value?.filterType || form.value.type) params.set('admin-preview-type', String(activeResource.value?.filterType || form.value.type))
+  if (activeResource.value?.key === 'international_notes') params.set('admin-preview-type', 'note')
   if (activeField.value) params.set('admin-preview-field', activeField.value)
   return `/?${params.toString()}`
 })
 const navigationGroups = computed(() => {
   const definitions = [
-    { label: 'Home', keys: ['profile', 'positions', 'research_areas', 'research_interests'] },
+    { label: 'Home', keys: ['profile', 'positions', 'research_areas', 'research_interests', 'research_stats', 'academic_links'] },
+    { label: 'News', keys: ['news'] },
+    { label: 'Honors', keys: ['honors'] },
     { label: 'Research', keys: ['research_summaries', 'research'] },
     { label: 'Publications', keys: ['journal_papers', 'conference_papers', 'other_works'] },
     { label: 'Projects', keys: ['collaboration_projects', 'projects'] },
     { label: 'Experience', keys: ['experiences', 'experience_professional_service', 'experience_teaching', 'experience_training'] },
-    { label: 'International', keys: ['international_visit_exchange', 'international_approved_cooperation', 'international_developing_cooperation'] },
+    { label: 'International', keys: ['international_items', 'international_notes', 'international_conferences'] },
     { label: 'Lab', keys: ['labs', 'research_topics', 'lab_members', 'lab_activities'] },
   ]
   return definitions.map((group) => ({
@@ -131,18 +138,19 @@ async function loadResources() {
   }))
   const experience = normalized.find((resource) => resource.key === 'experience_items')
   const international = normalized.find((resource) => resource.key === 'international_items')
+  const internationalConferences = normalized.find((resource) => resource.key === 'international_conferences')
   resources.value = normalized
-    .filter((resource) => !['experience_items', 'international_items'].includes(resource.key))
+    .filter((resource) => !['experience_items', 'international_items', 'international_conferences'].includes(resource.key))
     .concat(experience ? [
       { ...experience, key: 'experience_professional_service', label: '專業服務', apiKey: 'experience_items', filterType: 'professional_service', fields: experience.fields.map((field) => field.name === 'type' ? { ...field, type: 'hidden' } : field) },
       { ...experience, key: 'experience_teaching', label: '教學與人才培育', apiKey: 'experience_items', filterType: 'teaching', fields: experience.fields.map((field) => field.name === 'type' ? { ...field, type: 'hidden' } : field) },
       { ...experience, key: 'experience_training', label: '專業訓練', apiKey: 'experience_items', filterType: 'training', fields: experience.fields.map((field) => field.name === 'type' ? { ...field, type: 'hidden' } : field) },
     ] : [])
     .concat(international ? [
-      { ...international, key: 'international_visit_exchange', label: '國際訪問與技術交流', apiKey: 'international_items', filterType: 'visit_exchange', fields: international.fields.map((field) => field.name === 'type' ? { ...field, type: 'hidden' } : field) },
-      { ...international, key: 'international_approved_cooperation', label: '已核定國際合作', apiKey: 'international_items', filterType: 'approved_cooperation', fields: international.fields.map((field) => field.name === 'type' ? { ...field, type: 'hidden' } : field) },
-      { ...international, key: 'international_developing_cooperation', label: '發展中的合作', apiKey: 'international_items', filterType: 'developing_cooperation', fields: international.fields.map((field) => field.name === 'type' ? { ...field, type: 'hidden' } : field) },
+      { ...international, label: '國際合作單位' },
+      { ...international, key: 'international_notes', label: '國際合作補充說明', apiKey: 'international_items', filterField: 'is_note', filterValue: '1', fields: international.fields.filter((field) => ['description', 'is_note', 'visibility'].includes(field.name)) },
     ] : [])
+    .concat(internationalConferences ? [{ ...internationalConferences, label: '國際會議足跡' }] : [])
   if (!activeKey.value && resources.value.length) activeKey.value = resources.value[0]!.key
   await loadRows()
 }
@@ -153,7 +161,11 @@ async function loadRows() {
   error.value = ''
   try {
     const loadedRows: Row[] = await api(`/${resourceApiKey.value}`)
-    rows.value = activeResource.value?.filterType ? loadedRows.filter((row) => row.type === activeResource.value?.filterType) : loadedRows
+    rows.value = activeResource.value?.filterField
+      ? loadedRows.filter((row) => String(row[activeResource.value!.filterField!]) === activeResource.value!.filterValue)
+      : activeResource.value?.filterType
+        ? loadedRows.filter((row) => row.type === activeResource.value?.filterType)
+        : loadedRows
   } catch (loadError) {
     error.value = loadError instanceof Error ? loadError.message : '讀取失敗'
   } finally {
@@ -169,6 +181,7 @@ async function selectResource(key: string) {
 
 function emptyForm(resource: Resource) {
   const values = Object.fromEntries(resource.fields.map((field) => [field.name, field.type === 'number' ? 0 : (field.options?.[0]?.value ?? '')]))
+  if (resource.fields.some((field) => field.name === 'visibility')) values.visibility = 'draft'
   if (resource.fields.some((field) => field.name === 'photo_position')) values.photo_position = '50% 50%'
   return values
 }
@@ -187,9 +200,15 @@ function setPhotoPosition(index: number, event: Event) {
 
 function fieldVisible(field: Field) {
   if (field.type === 'hidden') return false
+  if (activeKey.value === 'other_works' && field.name === 'kind') return true
+  if (activeKey.value === 'projects') {
+    if (field.name === 'period') return form.value.project_type === 'dream'
+    if (field.name === 'start_date' || field.name === 'end_date') return form.value.project_type !== 'dream'
+  }
   if (activeKey.value !== 'other_works') return true
-  if (field.name === 'description') return form.value.kind !== 'patent'
-  if (field.name === 'patent_number' || field.name === 'inventor_or_owner') return form.value.kind === 'patent'
+  const patentKind = form.value.kind === 'patent' || form.value.kind === 'utility_patent'
+  if (field.name === 'description') return !patentKind
+  if (field.name === 'patent_number' || field.name === 'inventor_or_owner') return patentKind
   return true
 }
 
@@ -198,6 +217,8 @@ function openCreate() {
   editingId.value = null
   form.value = emptyForm(activeResource.value)
   if (activeResource.value.filterType) form.value.type = activeResource.value.filterType
+  if (activeResource.value.filterField && activeResource.value.filterValue) form.value[activeResource.value.filterField] = activeResource.value.filterValue
+  if (activeResource.value.key === 'international_notes') form.value.status = 'exchange'
   activeField.value = activeResource.value.fields[0]?.name || ''
   error.value = ''
   editorOpen.value = true
@@ -347,6 +368,10 @@ async function logout(callApi = true) {
 }
 
 function rowSummary(row: Row, resource: Resource) {
+  if (resource.key === 'projects') {
+    const timeline = row.project_type === 'dream' ? [row.title, row.period] : [row.title, row.start_date, row.end_date]
+    return timeline.filter(Boolean).map(String).join(' · ')
+  }
   return resource.fields
     .filter((field) => field.type !== 'number' && field.type !== 'hidden' && row[field.name])
     .slice(0, 2)
@@ -508,7 +533,8 @@ onMounted(restoreSession)
                 <span v-if="uploadingField === field.name">圖片上傳中…</span>
               </div>
               <textarea v-else-if="field.type === 'textarea'" v-model="form[field.name]" :required="field.required" rows="4" @focus="activeField = field.name" />
-              <select v-else-if="field.type === 'select'" v-model="form[field.name]" :required="field.required" :disabled="activeKey === 'other_works' && field.name === 'kind' && editingId != null" @focus="activeField = field.name"><option v-for="option in field.options" :key="option.value" :value="option.value">{{ option.label }}</option></select>
+              <input v-else-if="field.type === 'checkbox'" v-model="form[field.name]" type="checkbox" :true-value="1" :false-value="0" @focus="activeField = field.name" />
+              <select v-else-if="field.type === 'select'" v-model="form[field.name]" :required="field.required" @focus="activeField = field.name"><option v-for="option in field.options" :key="option.value" :value="option.value">{{ option.label }}</option></select>
               <input v-else v-model="form[field.name]" :type="field.type" :required="field.required" @focus="activeField = field.name" />
             </label>
             <p v-if="error" class="admin-error" role="alert">{{ error }}</p>
