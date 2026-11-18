@@ -11,7 +11,7 @@ const resources = {
   research_summaries: { label: '研究成果摘要', fields: [['text', '摘要', 'textarea', true], ['sort_order', '排序', 'number']] },
   journal_papers: { label: '期刊論文', fields: [['year', '年份', 'number'], ['authors', '作者'], ['title', '論文標題', 'textarea', true], ['journal', '期刊'], ['is_scie', 'SCIE', 'checkbox'], ['is_ei', 'EI', 'checkbox'], ['is_featured', '是否精選', 'select', false, [['0', '否'], ['1', '是']]], ['doi_url', 'DOI／網址', 'url'], ['graphical_abstract', '圖像摘要', 'image'], ['sort_order', '排序', 'number']] },
   conference_papers: { label: '研討會論文', fields: [['year', '年份', 'number'], ['authors', '作者'], ['title', '論文標題', 'textarea', true], ['conference', '研討會'], ['is_ei', 'EI', 'checkbox'], ['is_featured', '是否精選', 'select', false, [['0', '否'], ['1', '是']]], ['graphical_abstract', '圖像摘要', 'image'], ['sort_order', '排序', 'number']] },
-  other_works: { label: '專利與其他著作', virtual: true, fields: [['kind', '資料類型', 'select', true, [['publication', '其他著作'], ['patent', '發明專利'], ['utility_patent', '新型專利']]], ['year', '年份', 'number'], ['title', '標題', 'textarea', true], ['description', '著作說明', 'textarea'], ['patent_number', '專利號碼'], ['inventor_or_owner', '發明人／權利人'], ['sort_order', '排序', 'number']] },
+  other_works: { label: '專利與其他著作', virtual: true, fields: [['kind', '資料類型', 'select', true, [['publication', '其他著作'], ['patent', '發明專利'], ['utility_patent', '新型專利']]], ['year', '年份', 'number'], ['title', '標題', 'textarea', true], ['description', '說明（中文）', 'textarea'], ['description_en', '說明（英文）', 'textarea'], ['patent_number', '專利號碼'], ['inventor_or_owner', '發明人／權利人'], ['sort_order', '排序', 'number']] },
   other_publications: { label: '其他著作', fields: [['year', '年份', 'number'], ['title', '標題', 'textarea', true], ['description', '說明', 'textarea'], ['sort_order', '排序', 'number']] },
   patents: { label: '專利', fields: [['year', '年份', 'number'], ['patent_type', '專利類型', 'select', false, [['invention', '發明專利'], ['utility', '新型專利']]], ['title', '專利名稱', 'textarea', true], ['patent_number', '專利號碼'], ['inventor_or_owner', '發明人／權利人'], ['sort_order', '排序', 'number']] },
   projects: { label: '主持人計畫', fields: [['project_type', '計畫類型', 'select', true, [['general', '一般計畫'], ['dream', '學海築夢']]], ['period', '學年度／梯次'], ['start_date', '開始日期', 'date'], ['end_date', '結束日期', 'date'], ['title', '計畫名稱', 'textarea', true], ['organization', '補助／合作機構'], ['funding_category', '補助單位', 'select', false, [['national_science', '國科會'], ['rural_conservation', '農村水保署'], ['water_resources', '水利署'], ['education', '教育部'], ['private', '民間']]], ['role', '角色'], ['summary', '計畫摘要', 'textarea'], ['research_location', '研究區位'], ['outcome_url', '成果連結', 'url'], ['photo', '照片', 'image'], ['photo_position', '照片位置', 'hidden'], ['sort_order', '排序', 'number']] },
@@ -35,7 +35,7 @@ const resources = {
 const visibilityField = ['visibility', '公開狀態', 'select', false, [['published', '公開'], ['draft', '草稿'], ['hidden', '隱藏']]]
 for (const definition of Object.values(resources)) {
   const englishFields = definition.fields
-    .filter(([name, , type = 'text']) => !String(name).endsWith('_en') && !['name_zh', 'name_en', 'email', 'value'].includes(name) && ['text', 'textarea'].includes(type))
+    .filter(([name, , type = 'text']) => !definition.fields.some(([candidate]) => candidate === `${'${name}'}_en`) && !String(name).endsWith('_en') && !['name_zh', 'name_en', 'email', 'value'].includes(name) && ['text', 'textarea'].includes(type))
     .map(([name, label, type]) => [`${name}_en`, `${label}（英文）`, type])
   definition.fields.push(...englishFields)
   if (!definition.fields.some(([name]) => name === 'visibility')) definition.fields.push(visibilityField)
@@ -342,13 +342,13 @@ async function adminApi(request, path, env) {
 }
 
 async function otherWorksApi(request, parts, env) {
-  if (request.method === 'GET' && parts.length === 1) return json(await all(env.DB, `SELECT id * 2 AS id, CASE WHEN patent_type = 'utility' THEN 'utility_patent' ELSE 'patent' END AS kind, year, title, title_en, NULL AS description, NULL AS description_en, patent_number, inventor_or_owner, inventor_or_owner_en, sort_order, visibility FROM patents UNION ALL SELECT id * 2 + 1 AS id, 'publication' AS kind, year, title, title_en, description, description_en, NULL AS patent_number, NULL AS inventor_or_owner, NULL AS inventor_or_owner_en, sort_order, visibility FROM other_publications ORDER BY sort_order ASC, id ASC`))
+  if (request.method === 'GET' && parts.length === 1) return json(await all(env.DB, `SELECT id * 2 AS id, CASE WHEN patent_type = 'utility' THEN 'utility_patent' ELSE 'patent' END AS kind, year, title, title_en, description, description_en, patent_number, inventor_or_owner, inventor_or_owner_en, sort_order, visibility FROM patents UNION ALL SELECT id * 2 + 1 AS id, 'publication' AS kind, year, title, title_en, description, description_en, NULL AS patent_number, NULL AS inventor_or_owner, NULL AS inventor_or_owner_en, sort_order, visibility FROM other_publications ORDER BY sort_order ASC, id ASC`))
   if (request.method === 'POST' && parts.length === 1) {
     const values = normalizePayload(resources.other_works, await request.json().catch(() => ({})))
     const last = await first(env.DB, 'SELECT MAX(value) AS value FROM (SELECT COALESCE(MAX(sort_order), -1) AS value FROM patents UNION ALL SELECT COALESCE(MAX(sort_order), -1) FROM other_publications)')
     const sortOrder = Number(last.value) + 1
     if (values.kind === 'patent' || values.kind === 'utility_patent') {
-      const result = await run(env.DB, 'INSERT INTO patents (year, patent_type, title, title_en, patent_number, inventor_or_owner, inventor_or_owner_en, sort_order, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [values.year, values.kind === 'utility_patent' ? 'utility' : 'invention', values.title, values.title_en, values.patent_number, values.inventor_or_owner, values.inventor_or_owner_en, sortOrder, values.visibility || 'draft'])
+      const result = await run(env.DB, 'INSERT INTO patents (year, patent_type, title, title_en, description, description_en, patent_number, inventor_or_owner, inventor_or_owner_en, sort_order, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [values.year, values.kind === 'utility_patent' ? 'utility' : 'invention', values.title, values.title_en, values.description, values.description_en, values.patent_number, values.inventor_or_owner, values.inventor_or_owner_en, sortOrder, values.visibility || 'draft'])
       return json({ ...values, id: result.meta.last_row_id * 2, sort_order: sortOrder }, 201)
     }
     const result = await run(env.DB, 'INSERT INTO other_publications (year, title, title_en, description, description_en, sort_order, visibility) VALUES (?, ?, ?, ?, ?, ?, ?)', [values.year, values.title, values.title_en, values.description, values.description_en, sortOrder, values.visibility || 'draft'])
@@ -370,7 +370,7 @@ async function otherWorksApi(request, parts, env) {
     const targetIsPatent = values.kind === 'patent' || values.kind === 'utility_patent'
     if (sourceIsPatent !== targetIsPatent) {
       if (targetIsPatent) {
-        const result = await run(env.DB, 'INSERT INTO patents (year, patent_type, title, title_en, patent_number, inventor_or_owner, inventor_or_owner_en, sort_order, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [values.year, values.kind === 'utility_patent' ? 'utility' : 'invention', values.title, values.title_en, values.patent_number, values.inventor_or_owner, values.inventor_or_owner_en, sourceRow.sort_order, values.visibility || 'draft'])
+        const result = await run(env.DB, 'INSERT INTO patents (year, patent_type, title, title_en, description, description_en, patent_number, inventor_or_owner, inventor_or_owner_en, sort_order, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [values.year, values.kind === 'utility_patent' ? 'utility' : 'invention', values.title, values.title_en, values.description, values.description_en, values.patent_number, values.inventor_or_owner, values.inventor_or_owner_en, sourceRow.sort_order, values.visibility || 'draft'])
         await run(env.DB, 'DELETE FROM other_publications WHERE id = ?', [item.id])
         return json({ ...values, id: result.meta.last_row_id * 2, sort_order: sourceRow.sort_order })
       }
@@ -379,7 +379,7 @@ async function otherWorksApi(request, parts, env) {
       return json({ ...values, id: result.meta.last_row_id * 2 + 1, sort_order: sourceRow.sort_order })
     }
     const statement = item.kind === 'patent' || item.kind === 'utility_patent'
-      ? ['UPDATE patents SET year = ?, patent_type = ?, title = ?, title_en = ?, patent_number = ?, inventor_or_owner = ?, inventor_or_owner_en = ?, visibility = ? WHERE id = ?', [values.year, values.kind === 'utility_patent' ? 'utility' : 'invention', values.title, values.title_en, values.patent_number, values.inventor_or_owner, values.inventor_or_owner_en, values.visibility || 'draft', item.id]]
+      ? ['UPDATE patents SET year = ?, patent_type = ?, title = ?, title_en = ?, description = ?, description_en = ?, patent_number = ?, inventor_or_owner = ?, inventor_or_owner_en = ?, visibility = ? WHERE id = ?', [values.year, values.kind === 'utility_patent' ? 'utility' : 'invention', values.title, values.title_en, values.description, values.description_en, values.patent_number, values.inventor_or_owner, values.inventor_or_owner_en, values.visibility || 'draft', item.id]]
       : ['UPDATE other_publications SET year = ?, title = ?, title_en = ?, description = ?, description_en = ?, visibility = ? WHERE id = ?', [values.year, values.title, values.title_en, values.description, values.description_en, values.visibility || 'draft', item.id]]
     const result = await run(env.DB, statement[0], statement[1])
     return result.meta.changes ? json({ ...values, id: Number(parts[1]) }) : json({ error: '找不到要修改的資料' }, 404)

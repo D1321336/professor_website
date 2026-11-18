@@ -35,9 +35,9 @@ const resources = {
   research_interests: { label: '研究興趣', fields: [['title', '興趣名稱', 'text', true], ['sort_order', '排序', 'number']] },
   research: { label: '研究方向', fields: [['title', '標題', 'text', true], ['description', '說明', 'textarea'], ['photo', '照片', 'image'], ['photo_position', '照片位置', 'hidden'], ['sort_order', '排序', 'number']] },
   research_summaries: { label: '研究成果摘要', fields: [['text', '摘要', 'textarea', true], ['sort_order', '排序', 'number']] },
-  journal_papers: { label: '期刊論文', fields: [['year', '年份', 'number'], ['authors', '作者'], ['title', '論文標題', 'textarea', true], ['journal', '期刊'], ['doi_url', 'DOI／網址', 'url'], ['photo', '照片', 'image'], ['photo_position', '照片位置', 'hidden'], ['sort_order', '排序', 'number']] },
-  conference_papers: { label: '研討會論文', fields: [['year', '年份', 'number'], ['authors', '作者'], ['title', '論文標題', 'textarea', true], ['conference', '研討會'], ['photo', '照片', 'image'], ['photo_position', '照片位置', 'hidden'], ['sort_order', '排序', 'number']] },
-  other_works: { label: '專利與其他著作', virtual: true, fields: [['kind', '資料類型', 'select', true, [['publication', '其他著作'], ['patent', '發明專利']]], ['year', '年份', 'number'], ['title', '標題', 'textarea', true], ['description', '著作說明', 'textarea'], ['patent_number', '專利號碼'], ['inventor_or_owner', '發明人／權利人'], ['sort_order', '排序', 'number']] },
+  journal_papers: { label: '期刊論文', fields: [['year', '年份', 'number'], ['authors', '作者'], ['title', '論文標題', 'textarea', true], ['journal', '期刊'], ['doi_url', 'DOI／網址', 'url'], ['photo', '照片', 'image'], ['photo_position', '照片位置', 'hidden'], ['sort_order', '排序', 'number'], ['authors_en', '作者（英文）'], ['journal_en', '期刊（英文）']] },
+  conference_papers: { label: '研討會論文', fields: [['year', '年份', 'number'], ['authors', '作者'], ['title', '論文標題', 'textarea', true], ['conference', '研討會'], ['photo', '照片', 'image'], ['photo_position', '照片位置', 'hidden'], ['sort_order', '排序', 'number'], ['authors_en', '作者（英文）']] },
+  other_works: { label: '專利與其他著作', virtual: true, fields: [['kind', '資料類型', 'select', true, [['publication', '其他著作'], ['patent', '發明專利'], ['utility_patent', '新型專利']]], ['year', '年份', 'number'], ['title', '標題', 'textarea', true], ['description', '說明（中文）', 'textarea'], ['description_en', '說明（英文）', 'textarea'], ['patent_number', '專利號碼'], ['inventor_or_owner', '發明人／權利人'], ['sort_order', '排序', 'number']] },
   other_publications: { label: '其他著作', fields: [['year', '年份', 'number'], ['title', '標題', 'textarea', true], ['description', '說明', 'textarea'], ['sort_order', '排序', 'number']] },
   patents: { label: '發明專利', fields: [['year', '年份', 'number'], ['title', '專利名稱', 'textarea', true], ['patent_number', '專利號碼'], ['inventor_or_owner', '發明人／權利人'], ['sort_order', '排序', 'number']] },
   projects: { label: '主持人計畫', fields: [['period', '期間'], ['title', '計畫名稱', 'textarea', true], ['organization', '補助／合作機構'], ['role', '角色'], ['status', '狀態'], ['photo', '照片', 'image'], ['photo_position', '照片位置', 'hidden'], ['sort_order', '排序', 'number']] },
@@ -126,9 +126,9 @@ const decodeOtherWorkId = (value) => {
 router.get('/other_works', async (req, res) => {
   try {
     const rows = await dbAll(`
-      SELECT id * 2 AS id, 'patent' AS kind, year, title, NULL AS description, patent_number, inventor_or_owner, sort_order FROM patents
+      SELECT id * 2 AS id, CASE WHEN patent_type = 'utility' THEN 'utility_patent' ELSE 'patent' END AS kind, year, title, description, description_en, patent_number, inventor_or_owner, sort_order FROM patents
       UNION ALL
-      SELECT id * 2 + 1 AS id, 'publication' AS kind, year, title, description, NULL AS patent_number, NULL AS inventor_or_owner, sort_order FROM other_publications
+      SELECT id * 2 + 1 AS id, 'publication' AS kind, year, title, description, description_en, NULL AS patent_number, NULL AS inventor_or_owner, sort_order FROM other_publications
       ORDER BY sort_order ASC, id ASC
     `)
     res.json(rows)
@@ -145,11 +145,12 @@ router.post('/other_works', async (req, res) => {
     const last = await dbGet('SELECT MAX(value) AS value FROM (SELECT COALESCE(MAX(sort_order), -1) AS value FROM patents UNION ALL SELECT COALESCE(MAX(sort_order), -1) FROM other_publications)')
     const sortOrder = Number(last.value) + 1
     let result
-    if (values.kind === 'patent') {
-      result = await dbRun('INSERT INTO patents (year, title, patent_number, inventor_or_owner, sort_order) VALUES (?, ?, ?, ?, ?)', [values.year, values.title, values.patent_number, values.inventor_or_owner, sortOrder])
+    if (values.kind !== 'publication') {
+      const patentType = values.kind === 'utility_patent' ? 'utility' : 'invention'
+      result = await dbRun('INSERT INTO patents (year, patent_type, title, description, description_en, patent_number, inventor_or_owner, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [values.year, patentType, values.title, values.description, values.description_en ?? null, values.patent_number, values.inventor_or_owner, sortOrder])
       res.status(201).json({ ...values, id: result.id * 2, sort_order: sortOrder })
     } else {
-      result = await dbRun('INSERT INTO other_publications (year, title, description, sort_order) VALUES (?, ?, ?, ?)', [values.year, values.title, values.description, sortOrder])
+      result = await dbRun('INSERT INTO other_publications (year, title, description, description_en, sort_order) VALUES (?, ?, ?, ?, ?)', [values.year, values.title, values.description, values.description_en ?? null, sortOrder])
       res.status(201).json({ ...values, id: result.id * 2 + 1, sort_order: sortOrder })
     }
   } catch (error) {
@@ -176,9 +177,13 @@ router.put('/other_works/:id', async (req, res) => {
   if (!item) return res.status(400).json({ error: '資料編號無效' })
   try {
     const values = normalizePayload(resources.other_works, req.body)
+    if ((item.kind === 'publication') !== (values.kind === 'publication')) {
+      return res.status(400).json({ error: '本機後台僅支援在發明專利與新型專利之間切換' })
+    }
+    const patentType = values.kind === 'utility_patent' ? 'utility' : 'invention'
     const result = item.kind === 'patent'
-      ? await dbRun('UPDATE patents SET year = ?, title = ?, patent_number = ?, inventor_or_owner = ? WHERE id = ?', [values.year, values.title, values.patent_number, values.inventor_or_owner, item.id])
-      : await dbRun('UPDATE other_publications SET year = ?, title = ?, description = ? WHERE id = ?', [values.year, values.title, values.description, item.id])
+      ? await dbRun('UPDATE patents SET year = ?, patent_type = ?, title = ?, description = ?, description_en = ?, patent_number = ?, inventor_or_owner = ? WHERE id = ?', [values.year, patentType, values.title, values.description, values.description_en ?? null, values.patent_number, values.inventor_or_owner, item.id])
+      : await dbRun('UPDATE other_publications SET year = ?, title = ?, description = ?, description_en = ? WHERE id = ?', [values.year, values.title, values.description, values.description_en ?? null, item.id])
     if (!result.changes) return res.status(404).json({ error: '找不到要修改的資料' })
     res.json({ ...values, id: Number(req.params.id) })
   } catch (error) {

@@ -1,6 +1,6 @@
 import db from './db.js'
 
-const mediaColumns = [
+const contentColumns = [
   ['research', 'photo'],
   ['research', 'photo_position'],
   ['journal_papers', 'photo'],
@@ -9,10 +9,17 @@ const mediaColumns = [
   ['conference_papers', 'photo_position'],
   ['projects', 'photo'],
   ['projects', 'photo_position'],
+  ['journal_papers', 'authors_en'],
+  ['journal_papers', 'journal_en'],
+  ['conference_papers', 'authors_en'],
+  ['patents', 'patent_type', "TEXT NOT NULL DEFAULT 'invention'"],
+  ['patents', 'description'],
+  ['patents', 'description_en'],
+  ['other_publications', 'description_en'],
 ]
 
 export function initializeContentMedia() {
-  const addMediaColumns = mediaColumns.map(([table, column]) => new Promise((resolve) => {
+  const addContentColumns = contentColumns.map(([table, column, definition = 'TEXT']) => new Promise((resolve) => {
       db.all(`PRAGMA table_info(${table})`, [], (infoError, columns) => {
         if (infoError) {
           console.error(`Unable to inspect ${table}:`, infoError.message)
@@ -23,7 +30,7 @@ export function initializeContentMedia() {
           resolve()
           return
         }
-        db.run(`ALTER TABLE ${table} ADD COLUMN ${column} TEXT`, (alterError) => {
+        db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`, (alterError) => {
           if (alterError) console.error(`Unable to add ${table}.${column}:`, alterError.message)
           resolve()
         })
@@ -48,5 +55,5 @@ export function initializeContentMedia() {
     })
   })
 
-  return Promise.all([...addMediaColumns, removeProfilePhoto])
+  return Promise.all([...addContentColumns, removeProfilePhoto])
 }

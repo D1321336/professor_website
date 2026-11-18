@@ -102,14 +102,25 @@ const navigationLabels: Record<string, { zh: string; en: string }> = {
   Lab: { zh: '研究團隊', en: 'Lab' },
 }
 const navigationKeys: Record<string, string> = Object.fromEntries(Object.entries(navigationLabels).flatMap(([key, labels]) => [[key, key], [labels.zh, key], [labels.en, key]]))
-const navItems = computed(() => (home.value.navigation_items ?? []).map((item) => navigationKeys[String(item.name)] || String(item.name)))
+const hasHan = (text: string) => /\p{Script=Han}/u.test(text)
+const navItems = computed(() => (home.value.navigation_items ?? [])
+  .map((item) => navigationKeys[String(item.name)] || String(item.name))
+  .filter((key) => language.value !== 'en' || !hasHan(key)))
 const navLabel = (key: string) => navigationLabels[key]?.en || key
 const localized = (item: Item | undefined, field: string) => {
   if (!item) return ''
-  const english = String(item[`${field}_en`] || '').trim()
-  return language.value === 'en' && english ? english : String(item[field] ?? '')
+  const original = String(item[field] ?? '')
+  if (language.value !== 'en') return original
+  const english = String(item[`${field}_en`] ?? '').trim()
+  if (field === 'authors') return english || original
+  if (english && !hasHan(english)) return english
+  return hasHan(original) ? '' : original
 }
 const ui = (zh: string, en: string) => language.value === 'en' ? en : zh
+watch(language, () => {
+  document.documentElement.lang = ui('zh-Hant', 'en')
+  document.title = ui('黃振家 Cheng-Chia Huang｜水利工程與資源保育學系', 'Cheng-Chia Huang | Water Resources Engineering and Conservation')
+}, { immediate: true })
 const toggleLanguage = () => {
   language.value = language.value === 'zh' ? 'en' : 'zh'
   window.localStorage.setItem('site-language', language.value)
@@ -148,7 +159,14 @@ const latestNewsRows = computed(() => {
 })
 const newsFilter = ref('全部')
 const newsCategories = computed(() => ['全部', '受邀演講', '國際交流', '論文發表', '計畫', '學生與教學', ...new Set((newsData.value.news || []).map((item) => String(item.category || '')).filter((category) => !['受邀演講', '國際交流', '論文發表', '計畫', '學生與教學'].includes(category)))])
-const newsCategoryLabel = (category: string) => ({ 全部: 'All', 受邀演講: 'Invited Talks', 國際交流: 'International Exchange', 論文發表: 'Publications', 計畫: 'Projects', 學生與教學: 'Students and Teaching' }[category] || category)
+const newsCategoryLabel = (category: string) => {
+  if (language.value !== 'en') return category
+  const knownLabel = { 全部: 'All', 受邀演講: 'Invited Talks', 國際交流: 'International Exchange', 論文發表: 'Publications', 計畫: 'Projects', 學生與教學: 'Students and Teaching' }[category]
+  if (knownLabel) return knownLabel
+  const translated = (newsData.value.news || []).find((item) => item.category === category && localized(item, 'category'))
+  return localized(translated, 'category') || (hasHan(category) ? 'Other' : category)
+}
+const displayNewsCategory = (item: Item) => localized(item, 'category') || newsCategoryLabel(String(item.category ?? ''))
 const filteredNewsRows = computed(() => {
   const rows = newsData.value.news || []
   return newsFilter.value === '全部' ? rows : rows.filter((item) => String(item.category || '') === newsFilter.value)
@@ -724,7 +742,7 @@ onBeforeUnmount(() => {
         {{ language === 'zh' ? '選單' : 'MENU' }} <span aria-hidden="true">{{ mobileNavOpen ? '×' : '☰' }}</span>
       </button>
 
-      <nav :class="{ open: mobileNavOpen }" aria-label="主要導覽">
+      <nav :class="{ open: mobileNavOpen }" :aria-label="ui('主要導覽', 'Main navigation')">
         <button
           v-for="item in navItems"
           :key="item"
@@ -736,7 +754,7 @@ onBeforeUnmount(() => {
       </nav>
 
       <button class="language-toggle" type="button" :aria-label="language === 'zh' ? '切換為英文' : 'Switch to Chinese'" @click="toggleLanguage">
-        <span :class="{ active: language === 'zh' }">中</span><i aria-hidden="true">/</i><span :class="{ active: language === 'en' }">EN</span>
+        <span :class="{ active: language === 'zh' }">{{ ui('中', 'ZH') }}</span><i aria-hidden="true">/</i><span :class="{ active: language === 'en' }">EN</span>
       </button>
     </header>
 
@@ -768,18 +786,18 @@ onBeforeUnmount(() => {
             <button class="pixel-button primary" type="button" @click="openInterests">{{ ui('研究興趣', 'Research Interests') }}</button>
           </div>
             </div>
-            <div class="overview-metrics" aria-label="研究數據">
+            <div class="overview-metrics" :aria-label="ui('研究數據', 'Research metrics')">
               <article v-for="metric in researchMetrics" :key="metric.label"><strong>{{ metric.value }}</strong><span>{{ metric.label }}</span><small v-if="metric.note">{{ metric.note }}</small></article>
             </div>
           </div>
           <section class="overview-links" aria-labelledby="academic-links-title"><h2 id="academic-links-title">{{ ui('學術連結', 'Academic Links') }} <small>ACADEMIC LINKS</small></h2><nav><a v-for="link in academicLinks" :key="link[0]" :href="link[1]" target="_blank" rel="noreferrer">{{ link[0] }} <span>↗</span></a></nav></section>
-          <section class="overview-news" aria-labelledby="latest-news-title"><header><h2 id="latest-news-title">{{ ui('最新消息', 'Latest News') }} <small>LATEST NEWS</small></h2><span>{{ ui('最新 3 則', 'Latest 3') }}</span></header><div class="overview-news-grid"><article v-for="item in latestNewsRows" :key="item.id as number" :class="{ 'is-placeholder': Number(item.id) < 0 }" role="button" tabindex="0" @click="openNewsDetail(item)" @keydown.enter="openNewsDetail(item)"><img v-if="item.photo" :src="String(item.photo)" :alt="localized(item, 'title')" /><div><time>{{ item.news_date }}</time><span v-if="item.category">{{ localized(item, 'category') }}</span><strong>{{ localized(item, 'title') }}</strong><p v-if="item.content">{{ localized(item, 'content') }}</p></div><a v-if="item.url" :href="String(item.url)" target="_blank" rel="noreferrer" :aria-label="ui('閱讀消息', 'Read news')" @click.stop>↗</a></article></div><button class="overview-news-more" type="button" @click="selectNav('News')">{{ ui('查看全部', 'View All') }} ↗</button></section>
+          <section class="overview-news" aria-labelledby="latest-news-title"><header><h2 id="latest-news-title">{{ ui('最新消息', 'Latest News') }} <small>LATEST NEWS</small></h2><span>{{ ui('最新 3 則', 'Latest 3') }}</span></header><div class="overview-news-grid"><article v-for="item in latestNewsRows" :key="item.id as number" :class="{ 'is-placeholder': Number(item.id) < 0 }" role="button" tabindex="0" @click="openNewsDetail(item)" @keydown.enter="openNewsDetail(item)"><img v-if="item.photo" :src="String(item.photo)" :alt="localized(item, 'title')" /><div><time>{{ item.news_date }}</time><span v-if="item.category">{{ displayNewsCategory(item) }}</span><strong>{{ localized(item, 'title') }}</strong><p v-if="item.content">{{ localized(item, 'content') }}</p></div><a v-if="item.url" :href="String(item.url)" target="_blank" rel="noreferrer" :aria-label="ui('閱讀消息', 'Read news')" @click.stop>↗</a></article></div><button class="overview-news-more" type="button" @click="selectNav('News')">{{ ui('查看全部', 'View All') }} ↗</button></section>
         </div>
 
       </section>
 
       <div v-if="contentError" class="site-api-error" role="status">
-        資料暫時無法載入。<button type="button" @click="loadContent">重新連線</button>
+        {{ ui('資料暫時無法載入。', 'Content is temporarily unavailable.') }}<button type="button" @click="loadContent">{{ ui('重新連線', 'Retry') }}</button>
       </div>
 
         <section id="research" class="content-page research-page" :class="{ 'is-active': currentPage === 'Research' }" aria-labelledby="research-title">
@@ -841,9 +859,9 @@ onBeforeUnmount(() => {
           <div class="mini-window-title">{{ ui('合作計畫摘要', 'Collaborative Project Highlights') }}</div>
           <ul><li v-for="item in projectsData.collaboration_projects || []" :key="item.id as number" :data-admin-record="item.id">{{ localized(item, 'text') }}</li></ul>
         </div>
-        <div class="project-gantt" :aria-label="`2022 至 ${timelineEndYear - 1} 研究計畫甘特圖`"><div class="gantt-axis" :style="{ gridTemplateColumns: `35% repeat(${timelineYears.length}, 1fr)` }"><span class="gantt-axis-spacer" aria-hidden="true"></span><span v-for="year in timelineYears" :key="year">{{ year }}</span></div><i class="gantt-today-marker" :style="{ left: `calc(35% + ${todayTimelinePercent * 0.65}%)` }" aria-label="今天"><span>今天</span></i><article v-for="project in projectTimeline" :key="String(project.id || '')" class="gantt-row" role="button" tabindex="0" :aria-label="`查看計畫：${localized(project, 'title')}`" @click="openDetail('project', project)" @keydown.enter="openDetail('project', project)" @keydown.space.prevent="openDetail('project', project)"><div class="gantt-label"><strong>{{ projectStatusLabel(project.status) }}</strong><span>{{ localized(project, 'title') }}</span></div><div class="gantt-track" :style="{ background: `repeating-linear-gradient(90deg, #f0f5f8 0, #f0f5f8 calc(${100 / timelineYears.length}% - 1px), #cfdae3 calc(${100 / timelineYears.length}% - 1px), #cfdae3 ${100 / timelineYears.length}%)` }"><i :class="projectFundingClass(project.funding_category)" :style="{ left: `${project.left}%`, width: `${project.width}%` }"></i></div></article></div><div class="gantt-legend" aria-label="計畫單位顏色圖例"><span v-for="legend in projectFundingLegend" :key="legend.key"><i :class="`funding-${legend.key}`"></i>{{ legend.label }}</span></div>
+        <div class="project-gantt" :aria-label="ui(`2022 至 ${timelineEndYear - 1} 研究計畫甘特圖`, `Research project timeline, 2022 to ${timelineEndYear - 1}`)"><div class="gantt-axis" :style="{ gridTemplateColumns: `35% repeat(${timelineYears.length}, 1fr)` }"><span class="gantt-axis-spacer" aria-hidden="true"></span><span v-for="year in timelineYears" :key="year">{{ year }}</span></div><i class="gantt-today-marker" :style="{ left: `calc(35% + ${todayTimelinePercent * 0.65}%)` }" :aria-label="ui('今天', 'Today')"><span>{{ ui('今天', 'Today') }}</span></i><article v-for="project in projectTimeline" :key="String(project.id || '')" class="gantt-row" role="button" tabindex="0" :aria-label="ui('查看計畫', 'View project') + ' · ' + localized(project, 'title')" @click="openDetail('project', project)" @keydown.enter="openDetail('project', project)" @keydown.space.prevent="openDetail('project', project)"><div class="gantt-label"><strong>{{ projectStatusLabel(project.status) }}</strong><span>{{ localized(project, 'title') }}</span></div><div class="gantt-track" :style="{ background: `repeating-linear-gradient(90deg, #f0f5f8 0, #f0f5f8 calc(${100 / timelineYears.length}% - 1px), #cfdae3 calc(${100 / timelineYears.length}% - 1px), #cfdae3 ${100 / timelineYears.length}%)` }"><i :class="projectFundingClass(project.funding_category)" :style="{ left: `${project.left}%`, width: `${project.width}%` }"></i></div></article></div><div class="gantt-legend" :aria-label="ui('計畫單位顏色圖例', 'Project funding legend')"><span v-for="legend in projectFundingLegend" :key="legend.key"><i :class="`funding-${legend.key}`"></i>{{ legend.label }}</span></div>
         <div v-if="projectDreamProjects.length" class="dream-projects"><h3>{{ ui('學海築夢', 'Dream Projects') }}</h3><div class="dream-project-grid"><button v-for="project in projectDreamProjects" :key="String(project.id || '')" class="dream-project-card" type="button" @click="openDetail('project', project)"><strong>{{ localized(project, 'period') }}</strong><h4>{{ localized(project, 'title') }}</h4><p>{{ localized(project, 'organization') }}</p><small>VIEW PROJECT ↗</small></button></div></div>
-        <div ref="projectMarquee" class="project-marquee" :class="{ 'is-dragging': projectDragging }" aria-label="研究計畫輪播，移入可暫停，按住可左右拖曳" @pointerdown="startProjectDrag" @pointermove="moveProjectDrag" @pointerup="stopProjectDrag" @pointercancel="stopProjectDrag" @click.capture="guardProjectClick">
+        <div ref="projectMarquee" class="project-marquee" :class="{ 'is-dragging': projectDragging }" :aria-label="ui('研究計畫輪播，移入可暫停，按住可左右拖曳', 'Research project carousel. Hover to pause or drag to scroll')" @pointerdown="startProjectDrag" @pointermove="moveProjectDrag" @pointerup="stopProjectDrag" @pointercancel="stopProjectDrag" @click.capture="guardProjectClick">
           <div class="project-track">
             <div v-for="copy in 3" :key="copy" class="project-set" :aria-hidden="copy !== 1 ? 'true' : undefined">
               <button v-for="(project, index) in projectTimeline" :key="`${copy}-${project.id}`" class="project-strip-card" type="button" :tabindex="copy !== 1 ? -1 : 0" @click="openDetail('project', project)">
@@ -879,7 +897,7 @@ onBeforeUnmount(() => {
           <span>INVITED TALKS · INTERNATIONAL · PUBLICATIONS · PROJECTS · TEACHING</span>
         </header>
         
-        <div class="news-layout"><div class="news-pinned-stack"><article v-for="item in pinnedNewsRows" :key="item.id as number" class="news-card pinned" :data-admin-record="item.id" role="button" tabindex="0" @click="openNewsDetail(item)" @keydown.enter="openNewsDetail(item)"><img v-if="item.photo" :src="String(item.photo)" :alt="localized(item, 'title')" /><div class="news-card-copy"><time>{{ item.news_date }}</time><span>{{ localized(item, 'category') }}</span><h3>{{ Number(item.id) < 0 ? ui('尚無最新消息', 'No Latest News') : localized(item, 'title') }}</h3><p>{{ localized(item, 'content') }}</p><a v-if="item.url" :href="String(item.url)" target="_blank" rel="noreferrer" @click.stop>{{ ui('閱讀更多', 'Read More') }} ↗</a></div></article></div><div class="news-list"><div class="news-filters" role="tablist" :aria-label="ui('最新消息分類', 'News Categories')"><button v-for="category in newsCategories" :key="category" type="button" :class="{ active: newsFilter === category }" @click="newsFilter = category">{{ category === '全部' ? ui('全部', 'All') : newsCategoryLabel(category) }}</button></div><article v-for="item in newsListRows" :key="item.id as number" :data-admin-record="item.id" role="button" tabindex="0" @click="openNewsDetail(item)" @keydown.enter="openNewsDetail(item)"><time>{{ item.news_date }}</time><span>{{ localized(item, 'category') }}</span><strong>{{ localized(item, 'title') }}</strong></article><p v-if="newsFilter !== '全部' && !newsListRows.length" class="empty-note">{{ ui('尚無消息', 'No news in this category') }}</p></div></div>
+        <div class="news-layout"><div class="news-pinned-stack"><article v-for="item in pinnedNewsRows" :key="item.id as number" class="news-card pinned" :data-admin-record="item.id" role="button" tabindex="0" @click="openNewsDetail(item)" @keydown.enter="openNewsDetail(item)"><img v-if="item.photo" :src="String(item.photo)" :alt="localized(item, 'title')" /><div class="news-card-copy"><time>{{ item.news_date }}</time><span>{{ displayNewsCategory(item) }}</span><h3>{{ Number(item.id) < 0 ? ui('尚無最新消息', 'No Latest News') : localized(item, 'title') }}</h3><p>{{ localized(item, 'content') }}</p><a v-if="item.url" :href="String(item.url)" target="_blank" rel="noreferrer" @click.stop>{{ ui('閱讀更多', 'Read More') }} ↗</a></div></article></div><div class="news-list"><div class="news-filters" role="tablist" :aria-label="ui('最新消息分類', 'News Categories')"><button v-for="category in newsCategories" :key="category" type="button" :class="{ active: newsFilter === category }" @click="newsFilter = category">{{ category === '全部' ? ui('全部', 'All') : newsCategoryLabel(category) }}</button></div><article v-for="item in newsListRows" :key="item.id as number" :data-admin-record="item.id" role="button" tabindex="0" @click="openNewsDetail(item)" @keydown.enter="openNewsDetail(item)"><time>{{ item.news_date }}</time><span>{{ displayNewsCategory(item) }}</span><strong>{{ localized(item, 'title') }}</strong></article><p v-if="newsFilter !== '全部' && !newsListRows.length" class="empty-note">{{ ui('尚無消息', 'No news in this category') }}</p></div></div>
       </section>
 
       <section id="experience" class="content-page experience-page" aria-labelledby="experience-title">
@@ -894,7 +912,7 @@ onBeforeUnmount(() => {
           </li>
         </ol>
         <div class="experience-explorer">
-          <div class="experience-tabs" role="tablist" aria-label="其他經歷分類">
+          <div class="experience-tabs" role="tablist" :aria-label="ui('其他經歷分類', 'Experience categories')">
             <button v-for="group in experienceGroups" :id="`experience-tab-${group.key}`" :key="group.key" type="button" role="tab" :aria-selected="activeExperienceGroup === group.key" :aria-controls="`experience-panel-${group.key}`" :class="{ active: activeExperienceGroup === group.key }" @click="activeExperienceGroup = group.key">
               <span>{{ group.number }}</span><strong>{{ group.title }}</strong><small>{{ activeExperienceGroup === group.key ? 'OPEN' : 'VIEW' }}</small>
             </button>
@@ -907,9 +925,9 @@ onBeforeUnmount(() => {
           </Transition>
         </div>
         <div class="service-analytics">
-          <div class="service-chart"><h3>受邀演講年度統計</h3><div class="service-bars"><div v-for="([year, count]) in invitedTalkYearStats" :key="year" class="service-bar"><span :style="{ height: `${Math.max(12, count * 24)}px` }"></span><strong>{{ count }}</strong><small>{{ year }}</small></div></div></div>
-          <div class="service-chart"><h3>審稿期刊統計</h3><ol class="review-stat-list"><li v-for="item in serviceStatsData.review_stats || []" :key="String(item.id || '')"><span>{{ localized(item, 'journal') }}</span><strong>{{ item.count }}</strong></li></ol></div>
-          <div class="talk-list"><h3>精選受邀演講</h3><article v-for="item in featuredTalks" :key="String(item.id || '')"><time>{{ item.talk_date }}</time><strong>{{ localized(item, 'title') }}</strong><small>{{ localized(item, 'organization') }}</small></article></div>
+          <div class="service-chart"><h3>{{ ui('受邀演講年度統計', 'Invited Talks by Year') }}</h3><div class="service-bars"><div v-for="([year, count]) in invitedTalkYearStats" :key="year" class="service-bar"><span :style="{ height: `${Math.max(12, count * 24)}px` }"></span><strong>{{ count }}</strong><small>{{ year }}</small></div></div></div>
+          <div class="service-chart"><h3>{{ ui('審稿期刊統計', 'Journal Reviews') }}</h3><ol class="review-stat-list"><li v-for="item in serviceStatsData.review_stats || []" :key="String(item.id || '')"><span>{{ localized(item, 'journal') }}</span><strong>{{ item.count }}</strong></li></ol></div>
+          <div class="talk-list"><h3>{{ ui('精選受邀演講', 'Featured Invited Talks') }}</h3><article v-for="item in featuredTalks" :key="String(item.id || '')"><time>{{ item.talk_date }}</time><strong>{{ localized(item, 'title') }}</strong><small>{{ localized(item, 'organization') }}</small></article></div>
         </div>
       </section>
 
@@ -919,8 +937,8 @@ onBeforeUnmount(() => {
           <h2 id="international-title">{{ ui('國際合作', 'International Collaboration') }}</h2>
           <span>FENG CHIA UNIVERSITY, TAIWAN</span>
         </header>
-        <div class="international-stage" aria-label="臺灣逢甲大學 STARLAB">
-          <div class="international-hub"><strong>臺灣・逢甲大學 STARLAB</strong><span>Feng Chia University, Taiwan</span></div>
+        <div class="international-stage" :aria-label="ui('臺灣逢甲大學 STARLAB', 'STARLAB at Feng Chia University, Taiwan')">
+          <div class="international-hub"><strong>{{ ui('臺灣・逢甲大學 STARLAB', 'STARLAB') }}</strong><span>Feng Chia University, Taiwan</span></div>
         </div>
         <div class="international-status-legend" :aria-label="ui('合作狀態圖例', 'Cooperation Status Legend')">
           <span><i class="status-approved"></i>{{ internationalStatusLabel('approved') }}</span><span><i class="status-exchange"></i>{{ internationalStatusLabel('exchange') }}</span><span><i class="status-discussing"></i>{{ internationalStatusLabel('discussing') }}</span>
@@ -929,7 +947,7 @@ onBeforeUnmount(() => {
           <article v-for="region in internationalRegionCards" :key="region.key" class="continent-card">
             <header><div><h3>{{ language === 'en' ? region.en : region.zh }}</h3><small>{{ language === 'en' ? region.zh : region.en }}</small></div><strong>{{ region.items.length }}</strong></header>
             <div v-for="item in region.items" :key="String(item.id || '')" class="partner-card" :class="`status-${String(item.status || 'discussing')}`" :data-admin-record="item.id">
-              <small v-if="item.country || item.city" class="partner-location">{{ localized(item, 'country') }}{{ item.city ? ` · ${localized(item, 'city')}` : '' }}</small><strong>{{ localized(item, 'institution') }}</strong><small v-if="item.year" class="partner-year">{{ item.year }}</small><p>{{ localized(item, 'description') }}</p><a v-if="item.link" :href="String(item.link)" target="_blank" rel="noreferrer">相關連結 ↗</a>
+              <small v-if="item.country || item.city" class="partner-location">{{ localized(item, 'country') }}{{ item.city ? ` · ${localized(item, 'city')}` : '' }}</small><strong>{{ localized(item, 'institution') }}</strong><small v-if="item.year" class="partner-year">{{ item.year }}</small><p>{{ localized(item, 'description') }}</p><a v-if="item.link" :href="String(item.link)" target="_blank" rel="noreferrer">{{ ui('相關連結 ↗', 'Related Link ↗') }}</a>
             </div>
             <p v-if="!region.items.length" class="empty-note">{{ ui('目前尚無公開合作資料', 'No published cooperation data') }}</p>
           </article>
@@ -949,7 +967,7 @@ onBeforeUnmount(() => {
           <div class="lab-manifesto">
             <p class="lab-kicker">LABORATORY / ACTIVE RESEARCH BASE</p>
             <p class="lab-intro">{{ localized(labData.lab, 'description') }}</p>
-            <div class="lab-stats" role="tablist" aria-label="實驗室資料分類">
+            <div class="lab-stats" role="tablist" :aria-label="ui('實驗室資料分類', 'Lab categories')">
               <button v-for="group in labGroups" :id="`lab-tab-${group.key}`" :key="group.key" type="button" role="tab" :aria-selected="activeLabGroup === group.key" :aria-controls="`lab-panel-${group.key}`" :class="{ active: activeLabGroup === group.key }" @click="activeLabGroup = group.key">
                 <span>{{ group.number }}</span>
                 <strong>{{ group.key === 'topics' ? (labData.research_topics || []).length : group.key === 'members' ? (labData.lab_members || []).length : (labData.lab_activities || []).length }}</strong>
@@ -977,7 +995,7 @@ onBeforeUnmount(() => {
       <div class="contact-scene" aria-hidden="true"><span class="tower"></span><span class="tree one"></span><span class="tree two"></span></div>
       <div class="contact-content">
         <a v-if="profile.email" class="email-link" :href="`mailto:${profile.email}`">{{ profile.email }} <span>↗</span></a>
-        <address>{{ profile.address }}</address>
+        <address>{{ localized(profile, 'address') }}</address>
       </div>
       <div class="footer-line">
         <span>© {{ new Date().getFullYear() }} {{ settings.footer_name }}</span>
@@ -992,13 +1010,13 @@ onBeforeUnmount(() => {
         <section class="fields-modal content-modal publication-window" role="dialog" aria-modal="true" aria-labelledby="publication-window-title">
           <header class="fields-modal-header">
             <div class="window-title"><h2 id="publication-window-title">{{ selectedPublicationGroup.title }}</h2></div>
-            <div class="window-controls"><button type="button" :aria-label="`關閉${selectedPublicationGroup.title}`" @click="closePublicationGroup">×</button></div>
+            <div class="window-controls"><button type="button" :aria-label="`${ui('關閉', 'Close')} ${selectedPublicationGroup.title}`" @click="closePublicationGroup">×</button></div>
           </header>
           <ol class="publication-modal-list">
             <li v-for="item in selectedPublicationGroup.items" :key="item.id" :data-admin-record="item.id.split('-')[1]">
               <div v-if="item.graphicalAbstract" class="publication-item-visual">
-                <img class="publication-item-photo" :src="item.graphicalAbstract" alt="圖像摘要" />
-                <button class="image-zoom-button" type="button" aria-label="放大圖片" title="放大圖片" @click="openPublicationPhoto(item)">⛶</button>
+                <img class="publication-item-photo" :src="item.graphicalAbstract" :alt="ui('圖像摘要', 'Graphical abstract')" />
+                <button class="image-zoom-button" type="button" :aria-label="ui('放大圖片', 'Enlarge image')" :title="ui('放大圖片', 'Enlarge image')" @click="openPublicationPhoto(item)">⛶</button>
               </div>
               <time>{{ item.year }}</time>
               <div>
@@ -1015,9 +1033,9 @@ onBeforeUnmount(() => {
 
     <Transition name="modal">
       <div v-if="enlargedPublicationPhoto" class="publication-photo-backdrop" role="presentation" @mousedown.self="closePublicationPhoto">
-        <section class="publication-photo-dialog" role="dialog" aria-modal="true" :aria-label="`${enlargedPublicationPhoto.title} 圖片預覽`">
-          <button type="button" aria-label="關閉圖片預覽" @click="closePublicationPhoto">×</button>
-          <img :src="enlargedPublicationPhoto.photo" :alt="`${enlargedPublicationPhoto.title} 圖片`" />
+        <section class="publication-photo-dialog" role="dialog" aria-modal="true" :aria-label="`${enlargedPublicationPhoto.title} · ${ui('圖片預覽', 'Image preview')}`">
+          <button type="button" :aria-label="ui('關閉圖片預覽', 'Close image preview')" @click="closePublicationPhoto">×</button>
+          <img :src="enlargedPublicationPhoto.photo" :alt="`${enlargedPublicationPhoto.title} · ${ui('圖片', 'Image')}`" />
         </section>
       </div>
     </Transition>
@@ -1027,18 +1045,18 @@ onBeforeUnmount(() => {
         <section class="fields-modal" role="dialog" aria-modal="true" aria-labelledby="fields-title">
           <header class="fields-modal-header">
             <div class="window-title">
-              <h2 id="fields-title">研究領域</h2>
+              <h2 id="fields-title">{{ ui('研究領域', 'Research Areas') }}</h2>
             </div>
             <div class="window-controls">
-              <button type="button" aria-label="關閉研究領域" @click="closeFields">×</button>
+              <button type="button" :aria-label="ui('關閉研究領域', 'Close research areas')" @click="closeFields">×</button>
             </div>
           </header>
-          <div v-if="loadError" class="api-notice" role="status"><span>!</span>資料暫時無法載入。<button type="button" @click="loadHome">重新連線</button></div>
+          <div v-if="loadError" class="api-notice" role="status"><span>!</span>{{ ui('資料暫時無法載入。', 'Content is temporarily unavailable.') }}<button type="button" @click="loadHome">{{ ui('重新連線', 'Retry') }}</button></div>
           <ol class="field-list" :class="{ loading }">
             <li v-for="(area, index) in researchAreas" :key="area.id as number" :data-admin-record="area.id">
               <span>0{{ index + 1 }}</span><strong>{{ localized(area, 'title') }}</strong>
             </li>
-            <li v-if="!researchAreas.length && !loading"><span>--</span><strong>資料整理中</strong></li>
+            <li v-if="!researchAreas.length && !loading"><span>--</span><strong>{{ ui('資料整理中', 'Content is being prepared') }}</strong></li>
           </ol>
         </section>
       </div>
@@ -1048,13 +1066,13 @@ onBeforeUnmount(() => {
       <div v-if="aboutOpen" class="modal-backdrop" role="presentation" @mousedown.self="closeAbout">
         <section class="fields-modal content-modal about-window" role="dialog" aria-modal="true" aria-labelledby="about-window-title">
           <header class="fields-modal-header">
-            <div class="window-title"><h2 id="about-window-title">關於我</h2></div>
-            <div class="window-controls"><button type="button" aria-label="關閉關於我" @click="closeAbout">×</button></div>
+            <div class="window-title"><h2 id="about-window-title">{{ ui('關於我', 'About Me') }}</h2></div>
+            <div class="window-controls"><button type="button" :aria-label="ui('關閉關於我', 'Close About Me')" @click="closeAbout">×</button></div>
           </header>
           <div class="window-copy">
-            <p v-if="aboutLoading">資料載入中...</p>
+            <p v-if="aboutLoading">{{ ui('資料載入中...', 'Loading…') }}</p>
             <p v-for="paragraph in aboutParagraphs" v-else :key="paragraph">{{ paragraph }}</p>
-            <p v-if="aboutError" class="api-notice">資料暫時無法載入。</p>
+            <p v-if="aboutError" class="api-notice">{{ ui('資料暫時無法載入。', 'Content is temporarily unavailable.') }}</p>
           </div>
         </section>
       </div>
@@ -1064,15 +1082,15 @@ onBeforeUnmount(() => {
       <div v-if="interestsOpen" class="modal-backdrop" role="presentation" @mousedown.self="closeInterests">
         <section class="fields-modal content-modal interests-window" role="dialog" aria-modal="true" aria-labelledby="interests-window-title">
           <header class="fields-modal-header">
-            <div class="window-title"><h2 id="interests-window-title">研究興趣</h2></div>
-            <div class="window-controls"><button type="button" aria-label="關閉研究興趣" @click="closeInterests">×</button></div>
+            <div class="window-title"><h2 id="interests-window-title">{{ ui('研究興趣', 'Research Interests') }}</h2></div>
+            <div class="window-controls"><button type="button" :aria-label="ui('關閉研究興趣', 'Close research interests')" @click="closeInterests">×</button></div>
           </header>
           <ul class="window-interest-list">
-            <li v-if="aboutLoading"><span>--</span><strong>資料載入中...</strong></li>
+            <li v-if="aboutLoading"><span>--</span><strong>{{ ui('資料載入中...', 'Loading…') }}</strong></li>
             <li v-for="(item, index) in researchInterests" v-else :key="item.id as number" :data-admin-record="item.id">
               <span>{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ localized(item, 'title') }}</strong>
             </li>
-            <li v-if="aboutError"><span>!!</span><strong>資料暫時無法載入</strong></li>
+            <li v-if="aboutError"><span>!!</span><strong>{{ ui('資料暫時無法載入', 'Content is temporarily unavailable') }}</strong></li>
           </ul>
         </section>
       </div>
@@ -1082,16 +1100,16 @@ onBeforeUnmount(() => {
       <div v-if="detailOpen" class="modal-backdrop" role="presentation" @mousedown.self="closeDetail">
         <section class="fields-modal content-modal detail-window" role="dialog" aria-modal="true" aria-labelledby="detail-window-title">
           <header class="fields-modal-header">
-            <div class="window-title"><h2 id="detail-window-title">{{ detailType === 'research' ? '研究方向' : '研究計畫' }}</h2></div>
-            <div class="window-controls"><button type="button" aria-label="關閉詳細資料" @click="closeDetail">×</button></div>
+            <div class="window-title"><h2 id="detail-window-title">{{ detailType === 'research' ? ui('研究方向', 'Research Directions') : ui('研究計畫', 'Research Projects') }}</h2></div>
+            <div class="window-controls"><button type="button" :aria-label="ui('關閉詳細資料', 'Close details')" @click="closeDetail">×</button></div>
           </header>
           <div class="detail-window-content">
             <div v-if="selectedDetail.photo && detailType === 'project'" class="detail-photo-wrap">
               <img class="detail-photo" :src="String(selectedDetail.photo)" :style="{ objectPosition: String(selectedDetail.photo_position || '50% 50%') }" alt="" />
-              <button class="image-zoom-button" type="button" aria-label="放大圖片" title="放大圖片" @click="openDetailPhoto(selectedDetail)">⛶</button>
+              <button class="image-zoom-button" type="button" :aria-label="ui('放大圖片', 'Enlarge image')" :title="ui('放大圖片', 'Enlarge image')" @click="openDetailPhoto(selectedDetail)">⛶</button>
             </div>
             <img v-else-if="selectedDetail.photo" class="detail-photo" :src="String(selectedDetail.photo)" :style="{ objectPosition: String(selectedDetail.photo_position || '50% 50%') }" alt="" />
-            <p class="detail-meta">{{ detailType === 'research' ? 'RESEARCH DETAIL' : selectedDetail.period }}</p>
+            <p class="detail-meta">{{ detailType === 'research' ? 'RESEARCH DETAIL' : localized(selectedDetail, 'period') }}</p>
             <h3>{{ localized(selectedDetail, 'title') }}</h3>
             <p v-if="detailType === 'research'">{{ localized(selectedDetail, 'description') }}</p>
             <template v-else>
@@ -1110,8 +1128,8 @@ onBeforeUnmount(() => {
     <Transition name="modal">
       <div v-if="newsDetailOpen" class="modal-backdrop" role="presentation" @mousedown.self="closeNewsDetail">
         <section class="fields-modal content-modal detail-window" role="dialog" aria-modal="true" aria-labelledby="news-detail-title">
-          <header class="fields-modal-header"><div class="window-title"><h2 id="news-detail-title">最新消息</h2></div><div class="window-controls"><button type="button" aria-label="關閉消息詳細內容" @click="closeNewsDetail">×</button></div></header>
-          <div class="detail-window-content news-detail-content"><img v-if="selectedNews.photo" class="detail-photo" :src="String(selectedNews.photo)" :alt="localized(selectedNews, 'title')" /><p class="detail-meta">{{ selectedNews.news_date }} · {{ localized(selectedNews, 'category') }}</p><h3>{{ localized(selectedNews, 'title') }}</h3><p>{{ localized(selectedNews, 'content') }}</p><a v-if="selectedNews.url" class="news-detail-link" :href="String(selectedNews.url)" target="_blank" rel="noreferrer">閱讀更多 ↗</a></div>
+          <header class="fields-modal-header"><div class="window-title"><h2 id="news-detail-title">{{ ui('最新消息', 'Latest News') }}</h2></div><div class="window-controls"><button type="button" :aria-label="ui('關閉消息詳細內容', 'Close news details')" @click="closeNewsDetail">×</button></div></header>
+          <div class="detail-window-content news-detail-content"><img v-if="selectedNews.photo" class="detail-photo" :src="String(selectedNews.photo)" :alt="localized(selectedNews, 'title')" /><p class="detail-meta">{{ selectedNews.news_date }} · {{ displayNewsCategory(selectedNews) }}</p><h3>{{ localized(selectedNews, 'title') }}</h3><p>{{ localized(selectedNews, 'content') }}</p><a v-if="selectedNews.url" class="news-detail-link" :href="String(selectedNews.url)" target="_blank" rel="noreferrer">{{ ui('閱讀更多 ↗', 'Read More ↗') }}</a></div>
         </section>
       </div>
     </Transition>

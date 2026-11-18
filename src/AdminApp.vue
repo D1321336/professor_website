@@ -30,6 +30,16 @@ const accountForm = ref({ currentPassword: '', newPassword: '', confirmPassword:
 const accounts = ref<Array<{ id: number; username: string }>>([])
 
 const activeResource = computed(() => resources.value.find((item) => item.key === activeKey.value))
+const editorFields = computed(() => {
+  const fields = activeResource.value?.fields ?? []
+  const pairedFields = activeKey.value === 'other_works' ? ['description_en'] : ['authors_en', 'journal_en']
+  if (!['journal_papers', 'conference_papers', 'other_works'].includes(activeKey.value)) return fields
+
+  return fields.filter(({ name }) => !pairedFields.includes(name)).flatMap((field) => {
+    const english = fields.find(({ name }) => pairedFields.includes(name) && name === `${field.name}_en`)
+    return english ? [field, english] : [field]
+  })
+})
 const resourceApiKey = computed(() => activeResource.value?.apiKey || activeKey.value)
 const sortableResourceKeys = new Set([
   'positions', 'research_areas', 'research_interests', 'research', 'research_summaries',
@@ -148,7 +158,7 @@ async function loadResources() {
     ] : [])
     .concat(international ? [
       { ...international, label: '國際合作單位' },
-      { ...international, key: 'international_notes', label: '國際合作補充說明', apiKey: 'international_items', filterField: 'is_note', filterValue: '1', fields: international.fields.filter((field) => ['description', 'is_note', 'visibility'].includes(field.name)) },
+      { ...international, key: 'international_notes', label: '國際合作補充說明', apiKey: 'international_items', filterField: 'is_note', filterValue: '1', fields: international.fields.filter((field) => ['description', 'description_en', 'is_note', 'visibility'].includes(field.name)) },
     ] : [])
     .concat(internationalConferences ? [{ ...internationalConferences, label: '國際會議足跡' }] : [])
   if (!activeKey.value && resources.value.length) activeKey.value = resources.value[0]!.key
@@ -207,8 +217,7 @@ function fieldVisible(field: Field) {
   }
   if (activeKey.value !== 'other_works') return true
   const patentKind = form.value.kind === 'patent' || form.value.kind === 'utility_patent'
-  if (field.name === 'description') return !patentKind
-  if (field.name === 'patent_number' || field.name === 'inventor_or_owner') return patentKind
+  if (['patent_number', 'patent_number_en', 'inventor_or_owner', 'inventor_or_owner_en'].includes(field.name)) return patentKind
   return true
 }
 
@@ -321,6 +330,26 @@ async function saveAccount() {
   }
 }
 
+const englishFallbacks = computed(() => {
+  const resource = activeResource.value
+  const values: Row = {}
+  if (!resource) return values
+  for (const field of resource.fields) {
+    if (!field.name.endsWith('_en') || String(form.value[field.name] ?? '').trim()) continue
+    const sourceName = field.name === 'name_en' && resource.key === 'profile'
+      ? 'name_zh'
+      : field.name.slice(0, -3)
+    const sourceField = resource.fields.find(({ name }) => name === sourceName)
+    if (!sourceField || !fieldVisible(sourceField)) continue
+
+    const source = form.value[sourceName]
+    if (typeof source !== 'string' || !/\p{Script=Latin}/u.test(source)) continue
+    if (/(?!\p{Script=Latin})\p{Letter}/u.test(source)) continue
+    values[field.name] = source
+  }
+  return values
+})
+
 async function save() {
   if (!activeResource.value) return
   saving.value = true
@@ -328,7 +357,7 @@ async function save() {
   try {
     if (activeResource.value.filterType) form.value.type = activeResource.value.filterType
     const path = editingId.value == null ? `/${resourceApiKey.value}` : `/${resourceApiKey.value}/${editingId.value}`
-    await api(path, { method: editingId.value == null ? 'POST' : 'PUT', body: JSON.stringify(form.value) })
+    await api(path, { method: editingId.value == null ? 'POST' : 'PUT', body: JSON.stringify({ ...form.value, ...englishFallbacks.value }) })
     notice.value = editingId.value == null ? '資料已新增' : '資料已修改'
     closeEditor()
     await loadRows()
@@ -518,7 +547,7 @@ onMounted(restoreSession)
         <header><div><p class="admin-eyebrow">{{ editingId == null ? 'CREATE' : 'EDIT' }}</p><h2 id="admin-editor-title">{{ editingId == null ? '新增' : '修改' }}{{ activeResource.label }}</h2></div><button class="admin-close" aria-label="關閉" @click="closeEditor">×</button></header>
         <div class="admin-editor-layout">
           <form @submit.prevent="save">
-            <label v-for="field in activeResource.fields" v-show="fieldVisible(field)" :key="field.name">
+            <label v-for="field in editorFields" v-show="fieldVisible(field)" :key="field.name">
               <span>{{ field.label }}<b v-if="field.required"> *</b></span>
               <div v-if="field.type === 'image'" class="admin-image-field">
                 <img v-if="form[field.name]" :class="imagePreviewClass" :src="String(form[field.name])" :alt="`${field.label}預覽`" :style="{ objectPosition: String(form.photo_position || '50% 50%') }" />
@@ -532,10 +561,11 @@ onMounted(restoreSession)
                 <button v-if="form[field.name]" type="button" class="admin-remove-image" @click="form[field.name] = ''">移除照片</button>
                 <span v-if="uploadingField === field.name">圖片上傳中…</span>
               </div>
-              <textarea v-else-if="field.type === 'textarea'" v-model="form[field.name]" :required="field.required" rows="4" @focus="activeField = field.name" />
+              <textarea v-else-if="field.type === 'textarea'" v-model="form[field.name]" :placeholder="String(englishFallbacks[field.name] ?? '')" :required="field.required" rows="4" @focus="activeField = field.name" />
               <input v-else-if="field.type === 'checkbox'" v-model="form[field.name]" type="checkbox" :true-value="1" :false-value="0" @focus="activeField = field.name" />
               <select v-else-if="field.type === 'select'" v-model="form[field.name]" :required="field.required" @focus="activeField = field.name"><option v-for="option in field.options" :key="option.value" :value="option.value">{{ option.label }}</option></select>
-              <input v-else v-model="form[field.name]" :type="field.type" :required="field.required" @focus="activeField = field.name" />
+              <input v-else v-model="form[field.name]" :placeholder="String(englishFallbacks[field.name] ?? '')" :type="field.type" :required="field.required" @focus="activeField = field.name" />
+              <small v-if="englishFallbacks[field.name]">儲存時會自動帶入上述內容</small>
             </label>
             <p v-if="error" class="admin-error" role="alert">{{ error }}</p>
             <div class="admin-editor-actions"><button type="button" @click="closeEditor">取消</button><button class="admin-primary" :disabled="saving">{{ saving ? '儲存中…' : '儲存變更' }}</button></div>
