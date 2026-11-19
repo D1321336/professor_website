@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import AdminPasswordInput from './AdminPasswordInput.vue'
 
 type FieldOption = { value: string; label: string }
 type Field = { name: string; label: string; type: string; required: boolean; options?: FieldOption[] }
@@ -489,7 +490,7 @@ onMounted(restoreSession)
         <h1>管理員登入</h1>
         <form @submit.prevent="login">
           <label>帳號<input v-model="username" autocomplete="username" required /></label>
-          <label>密碼<input v-model="password" type="password" autocomplete="current-password" required /></label>
+          <AdminPasswordInput v-model="password" label="密碼" autocomplete="current-password" />
           <p v-if="error" class="admin-error" role="alert">{{ error }}</p>
           <button class="admin-primary" :disabled="loading">{{ loading ? '登入中…' : '登入' }}</button>
         </form>
@@ -581,12 +582,13 @@ onMounted(restoreSession)
     <div v-if="accountOpen" class="admin-modal-backdrop" @mousedown.self="accountOpen = false">
       <section class="admin-account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title">
         <header><div><p class="admin-eyebrow">ACCOUNT SECURITY</p><h2 id="account-title">{{ accountMode === 'password' ? '修改我的密碼' : '新增管理員帳號' }}</h2></div><button class="admin-close" aria-label="關閉" @click="accountOpen = false">×</button></header>
-        <p class="admin-hint">目前管理員：{{ accounts.map((item) => item.username).join('、') }}</p>
+        <p v-if="accountMode === 'password'" class="admin-hint">正在修改的帳號：<strong>{{ currentUser }}</strong></p>
+        <p v-else class="admin-hint">目前管理員：{{ accounts.map((item) => item.username).join('、') }}</p>
         <form @submit.prevent="saveAccount">
           <template v-if="accountMode === 'password'">
-            <label>目前密碼<input v-model="accountForm.currentPassword" type="password" autocomplete="current-password" required /></label>
-            <label>新密碼<input v-model="accountForm.newPassword" type="password" minlength="12" autocomplete="new-password" required /></label>
-            <label>再次輸入新密碼<input v-model="accountForm.confirmPassword" type="password" minlength="12" autocomplete="new-password" required /></label>
+            <AdminPasswordInput v-model="accountForm.currentPassword" label="目前密碼" autocomplete="current-password" />
+            <AdminPasswordInput v-model="accountForm.newPassword" label="新密碼" autocomplete="new-password" :minlength="12" />
+            <AdminPasswordInput v-model="accountForm.confirmPassword" label="再次輸入新密碼" autocomplete="new-password" :minlength="12" />
           </template>
           <template v-else>
             <label>新帳號<input v-model="accountForm.username" autocomplete="username" pattern="[A-Za-z0-9._-]{3,40}" required /></label>
